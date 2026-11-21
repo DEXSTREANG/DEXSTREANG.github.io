@@ -61,12 +61,29 @@ button{border:0;background:none;padding:0;cursor:pointer}
 .tw.g b{color:var(--sub)}
 
 .tw.gv i{font-size:1.5rem;color:transparent;text-shadow:0 0 0 var(--rc)}
+.tw.gv b{color:var(--sub)}   
+.tw.st b{font-size:1.55rem}   
 .hint{margin-top:.45rem;font-size:.9rem;color:var(--sub)}
 .memo{margin-top:.55rem;background:var(--pp2);border-radius:.6rem;padding:.5rem .65rem;font-size:1.05rem;word-break:break-all}
 .donebtn{display:block;width:100%;margin-top:.85rem;background:var(--rc);color:#0B0D10;font-weight:800;font-size:1.15rem;border-radius:.8rem;padding:.75rem 0}
 .donebtn:active{filter:brightness(.8)}
 .donebar{margin-top:.7rem;color:var(--grn);display:flex;justify-content:space-between;align-items:center}
 .donebar button{font-size:.85rem;color:var(--sub);text-decoration:underline}
+
+.pay{margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--ln);display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.pay .amt{color:var(--sub);font-size:1rem;padding:0}
+.pay .pr{display:flex;align-items:center}
+.pay .chip{background:#2C313B;color:#E6E9EE;font-weight:800;font-size:1rem;border-radius:.6rem;padding:.35rem .75rem;white-space:nowrap}
+.pay .wait{color:var(--sub);font-size:1rem}
+.pay .paybtn{border:2px solid var(--tx);color:var(--tx);font-weight:800;font-size:1.05rem;border-radius:.7rem;padding:.45rem .9rem;white-space:nowrap}
+.pay .undo{font-size:.85rem;color:var(--sub);text-decoration:underline;margin-left:.5rem;white-space:nowrap}
+.fee .mon{display:flex;align-items:center;justify-content:center;gap:1rem;font-size:1.35rem;font-weight:800;margin:.9rem 0 .6rem}
+.fee .tot div{display:flex;justify-content:space-between;align-items:baseline;padding:.3rem 0;font-size:1.05rem;color:var(--sub)}
+.fee .tot b{color:var(--tx);font-size:1.15rem}.fee .tot .g b{color:var(--tx)}.fee .tot .o b{color:#FF9A3D}
+.fee .tot .sm{font-size:.9rem;padding-top:0}
+.fee .it{display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:var(--pp);border-radius:.8rem;padding:.65rem .8rem;margin:0 .875rem .5rem;border-left:5px solid var(--rc)}
+.fee .it .l{display:flex;align-items:center;gap:.5rem;flex-wrap:nowrap;white-space:nowrap;min-width:0}.fee .it .d{color:var(--sub)}.fee .it .a{font-weight:800}
+.fee .it .paybtn{border:2px solid var(--tx);color:var(--tx);font-weight:800;border-radius:.6rem;padding:.3rem .65rem;white-space:nowrap}
 .offl{margin:.3rem .875rem 1rem;color:var(--sub);font-size:.95rem}
 .none{margin:1.2rem .875rem;padding:1.4rem 1rem;text-align:center;color:var(--sub);background:var(--pp);border-radius:.9rem}
 .monthbar{display:flex;align-items:center;justify-content:space-between;padding:.7rem .6rem .5rem}
@@ -282,6 +299,34 @@ function buildBoard(all, notes, fromDate, toDate, now) {
   return days;
 }
 function isCleaning(k) { return k === 'clean' || k === 'nosame'; }
+
+
+var PAY_FROM = '2026-11-22';                 
+var PRICE = { small: 55000, big: 95000 };    
+function priceOf(room) { return room === '와우산로' ? PRICE.big : PRICE.small; }
+function won(n) {
+  n = Math.round(Number(n) || 0);
+  return (n < 0 ? '-' : '') + '₩' + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function payOf(pay, date, room) {
+  var p = (pay || {})[date + '|' + room] || {}, custom = p.amt !== '' && p.amt != null && !isNaN(Number(p.amt));
+  return { amt: custom ? Number(p.amt) : priceOf(room), base: priceOf(room), custom: custom, at: p.at || '' };
+}
+
+function feeItems(all, notes, fromDate, toDate, now, pay) {
+  if (fromDate < PAY_FROM) fromDate = PAY_FROM;
+  if (toDate > now.today) toDate = now.today;
+  var out = [];
+  if (fromDate > toDate) return out;
+  buildBoard(all, notes, fromDate, toDate, now).forEach(function (day) {
+    ROOM_IDS.forEach(function (room) {
+      if (!isCleaning(day.cells[room].k)) return;
+      var p = payOf(pay, day.date, room);
+      out.push({ date: day.date, room: room, amt: p.amt, base: p.base, custom: p.custom, at: p.at });
+    });
+  });
+  return out;
+}
 
 
 function dateLine(date, cell) {
@@ -572,7 +617,7 @@ function planMail(p, all) {
 var LOGIC = {
   ICON: ICON, ROOM_IDS: ROOM_IDS, SMALL_ROOMS: SMALL_ROOMS, pad2: pad2, addDays: addDays, diffDays: diffDays, wdName: wdName, mdLabel: mdLabel,
   mdwLabel: mdwLabel, isYmd: isYmd, makeYmd: makeYmd, isActive: isActive, activeRes: activeRes, findConflicts: findConflicts,
-  computeCell: computeCell, smallTowels: smallTowels, bigTowels: bigTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
+  computeCell: computeCell, smallTowels: smallTowels, bigTowels: bigTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, PAY_FROM: PAY_FROM, PRICE: PRICE, priceOf: priceOf, won: won, payOf: payOf, feeItems: feeItems, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
   cellSig: cellSig, describeCell: describeCell, diffBoard: diffBoard, noticeText: noticeText, splitText: splitText,
   parseMail: parseMail, planMail: planMail, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten
 };
@@ -710,8 +755,8 @@ function num(i, v, unit, cls) { return '<span class="tw' + (cls || '') + '"><i>'
 function cardHtml(date, room, c) {
   var info = S.D.rooms[room], n = S.now, admin = S.role === 'admin', on = L.isCleaning(c.k), cx = !on && S.cx[date + '|' + room];
   var out = '<div class="card ' + RC[room] + (on ? '' : ' off') + '"><div class="ch"><span class="rn ' + RC[room] + '">' + h(info.name) + '</span><span class="st' + (cx ? ' cx' : '') + '">' + (cx ? '청소 취소' : (STATE[c.k] || '')) + '</span>' + (on ? '<span class="pw">' + IC.key + ' ' + h(info.pw || '') + '</span>' : '') + '</div>';
-  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small) + num(TW_B, c.big) + num(IC.guest, c.g, '', admin ? ' g' : ' gv') + '</div>';
-  else if (c.k === 'nosame') out += '<div class="nums">' + num(TW_S, c.small) + num(TW_B, c.big) + (c.next ? num(IC.guest, c.next.g, '', admin ? ' g' : ' gv') : '') + '</div>';
+  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + num(IC.guest, c.g, '', admin ? ' g' : ' gv') + '</div>';
+  else if (c.k === 'nosame') out += '<div class="nums">' + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + (c.next ? num(IC.guest, c.next.g, '', admin ? ' g' : ' gv') : '') + '</div>';
   else if (c.k === 'stay') { var st = stayOf(room, date); if (st) out += '<div class="hint">' + L.mdwLabel(st.checkin) + ' ~ ' + L.mdwLabel(st.checkout) + (admin ? ' · ' + IC.guest + ' ' + st.guests : '') + '</div>'; }
   if (on && c.notes && c.notes.length) out += '<div class="memo">' + c.notes.map(function (t) { return IC.note + ' ' + h(t); }).join('<br>') + '</div>';
   if (on && date <= n.today && date >= L.addDays(n.today, -2)) {
@@ -719,7 +764,18 @@ function cardHtml(date, room, c) {
     out += at ? '<div class="donebar"><span>✅ 청소 완료 ' + h(at.substr(11, 5)) + '</span><button data-act="done" data-d="' + date + '" data-r="' + room + '" data-on="0">취소</button></div>'
       : '<button class="donebtn" data-act="done" data-d="' + date + '" data-r="' + room + '" data-on="1">청소 완료</button>';
   }
+  if (on && date <= n.today && date >= L.PAY_FROM) out += payRow(date, room);
   return out + '</div>';
+}
+
+
+function payRow(date, room) {
+  var p = L.payOf(S.D.pay, date, room), admin = S.role === 'admin', at = ' data-d="' + date + '" data-r="' + room + '"';
+  var left = admin ? '<button class="amt" data-act="pay-amt"' + at + '>' + L.won(p.amt) + '</button>' : '<span class="amt">' + L.won(p.amt) + '</span>';
+  var right = p.at
+    ? '<span class="chip">💰 입금 완료' + (admin ? ' ' + h(p.at.substr(11, 5)) : '') + '</span>' + (admin ? '<button class="undo" data-act="pay" data-on="0"' + at + '>취소</button>' : '')
+    : (admin ? '<button class="paybtn" data-act="pay" data-on="1"' + at + '>입금 완료</button>' : '<span class="wait">입금 전</span>');
+  return '<div class="pay">' + left + '<span class="pr">' + right + '</span></div>';
 }
 
 
@@ -873,11 +929,37 @@ function adminSet() {
   out += '<div class="box"><h3>전달 글 첫 줄</h3><label class="fld">청소가 추가될 때<input id="s_h1" value="' + h(set.heads.add) + '"></label><label class="fld">내용이 바뀔 때<input id="s_h2" value="' + h(set.heads.change) + '"></label><label class="fld">청소가 취소될 때<input id="s_h3" value="' + h(set.heads.cancel) + '"></label><div class="row"><button class="btn sm fill" data-act="heads-save">저장</button></div></div>';
   return out;
 }
+function feeAll() { return L.feeItems(S.D.res, S.D.notes, L.PAY_FROM, S.now.today, S.now, S.D.pay); }
+function adminFee() {
+  var t = S.now.today, cur = t.substr(0, 7), first = L.PAY_FROM.substr(0, 7), minMon = shiftMonth(cur, -1);
+  if (minMon < first) minMon = first;
+  var ym = S.feeMon || cur; if (ym < minMon) ym = minMon; if (ym > cur) ym = cur; S.feeMon = ym;
+  var rg = monthRange(ym), items = L.feeItems(S.D.res, S.D.notes, rg[0], rg[1], S.now, S.D.pay);
+  var sum = 0, paid = 0, nS = 0, nB = 0, base = 0;
+  items.forEach(function (x) { sum += x.amt; base += x.base; if (x.at) paid += x.amt; if (x.room === '와우산로') nB++; else nS++; });
+  var unpaid = items.filter(function (x) { return !x.at; }).reverse(), extra = sum - base;
+  var out = '<div class="fee"><div class="mon"><button class="step" data-act="fee-mon" data-n="-1"' + (ym <= minMon ? ' disabled style="opacity:.25"' : '') + ' aria-label="지난달">‹</button>' + (+ym.substr(5, 2)) + '월'
+    + '<button class="step" data-act="fee-mon" data-n="1"' + (ym >= cur ? ' disabled style="opacity:.25"' : '') + ' aria-label="다음 달">›</button></div>';
+  out += '<div class="box tot"><div><span>청소 ' + items.length + '건</span><b>' + L.won(sum) + '</b></div>'
+    + '<div class="sm"><span>소형 ' + nS + '건 × ' + L.won(L.PRICE.small) + ' · 3BR ' + nB + '건 × ' + L.won(L.PRICE.big) + (extra ? ' · ' + (extra > 0 ? '추가금 ' : '조정 ') + L.won(extra) : '') + '</span></div>'
+    + '<div class="g"><span>입금 완료</span><b>' + L.won(paid) + '</b></div>'
+    + '<div class="o"><span>남은 입금 (' + unpaid.length + '건)</span><b>' + L.won(sum - paid) + '</b></div>'
+    + (ym === first && L.PAY_FROM.substr(8) !== '01' ? '<div class="sm"><span>' + (+first.substr(5, 2)) + '월은 ' + (+L.PAY_FROM.substr(8)) + '일 청소부터 적어요 · 오늘까지 한 청소만</span></div>' : '<div class="sm"><span>오늘까지 한 청소만</span></div>')
+    + '</div>';
+  if (unpaid.length) {
+    out += '<div class="secth">입금 안 한 청소</div>' + unpaid.map(function (x) {
+      return '<div class="it ' + RC[x.room] + '"><span class="l"><span class="rn ' + RC[x.room] + '">' + ROOM_SHORT[x.room] + '</span><span class="d">' + (+x.date.substr(5, 2)) + '/' + (+x.date.substr(8, 2)) + '(' + L.wdName(x.date) + ')</span><span class="a">' + L.won(x.amt) + '</span></span>'
+        + '<button class="paybtn" data-act="pay" data-on="1" data-d="' + x.date + '" data-r="' + x.room + '">입금 완료</button></div>';
+    }).join('');
+  }
+  return out + '</div>';
+}
 function viewAdmin() {
   var A = S.A, nTodo = A.todo.length, nOut = A.out.filter(function (o) { return o.kind === '전달' && !o.sent; }).length;
-  var tabs = [['todo', '할 일', nTodo], ['res', '예약', 0], ['notes', '전달사항', 0], ['out', '보낼 글', nOut], ['set', '설정', 0]];
+  var nFee = feeAll().filter(function (x) { return !x.at; }).length;
+  var tabs = [['todo', '할 일', nTodo], ['res', '예약', 0], ['notes', '전달사항', 0], ['out', '보낼 글', nOut], ['fee', '청소비', nFee], ['set', '설정', 0]];
   var out = '<div class="subnav">' + tabs.map(function (t) { return '<button class="' + (S.sub === t[0] ? 'on' : '') + '" data-act="sub" data-v="' + t[0] + '">' + t[1] + (t[2] ? '<span class="n">' + t[2] + '</span>' : '') + '</button>'; }).join('') + '</div>';
-  var fn = { todo: adminTodo, res: adminRes, notes: adminNotes, out: adminOut, set: adminSet }[S.sub] || adminTodo;
+  var fn = { todo: adminTodo, res: adminRes, notes: adminNotes, out: adminOut, fee: adminFee, set: adminSet }[S.sub] || adminTodo;
   return out + fn();
 }
 
@@ -950,6 +1032,12 @@ function renderSheet() {
       + '<div class="two"><label class="fld">체크인<input type="date" id="r_ci" value="' + h(x.checkin) + '"></label><label class="fld">체크아웃<input type="date" id="r_co" value="' + h(x.checkout) + '"></label></div>'
       + '<div class="two"><label class="fld">인원(성인+아동)<input type="number" inputmode="numeric" min="1" id="r_g" value="' + h(x.guests) + '"></label><label class="fld">메모<input id="r_memo" value="' + h(x.memo) + '"></label></div>'
       + '<div class="row"><button class="btn fill" data-act="res-save" data-id="' + h(x.id || '') + '">저장</button></div></div>';
+  } else if (sh.t === 'payamt') {
+    var pp = L.payOf(S.D.pay, sh.date, sh.room);
+    title = '청소비 금액 · ' + h(roomName(sh.room)) + ' ' + L.mdwLabel(sh.date);
+    body = '<div class="pad"><label class="fld">이 청소 금액(원)<input type="number" inputmode="numeric" min="0" step="1000" id="pa_amt" value="' + pp.amt + '"></label>'
+      + '<p style="margin:.4rem 0 0;color:var(--sub);font-size:.9rem">기본 금액 ' + L.won(pp.base) + ' — 추가금이 있을 때만 바꿔 주세요</p>'
+      + '<div class="row"><button class="btn fill" data-act="payamt-save"' + ' data-d="' + sh.date + '" data-r="' + sh.room + '">저장</button>' + (pp.custom ? '<button class="btn" data-act="payamt-reset" data-d="' + sh.date + '" data-r="' + sh.room + '">기본 금액으로</button>' : '') + '</div></div>';
   } else if (sh.t === 'mailtest') {
     title = '메일 읽기 점검 (최근 4일)';
     body = '<div class="pad"><p style="margin:0 0 .4rem;color:var(--sub)">장부에는 쓰지 않고, 예약 메일을 어떻게 읽었는지만 보여 줘요.</p>' + (sh.list.map(function (m) {
@@ -1003,6 +1091,11 @@ var ACT = {
   'copy-url': function () { copyOut(S.A.set.url || ''); },
   done: function (e) { act('apiDone', e.getAttribute('data-d'), e.getAttribute('data-r'), e.getAttribute('data-on') === '1').then(function (ok) { if (ok && e.getAttribute('data-on') === '1') toast('청소 완료로 표시했어요'); }); },
   ack: function (e) { act('apiAck', [e.getAttribute('data-id')]); },
+  pay: function (e) { var on = e.getAttribute('data-on') === '1'; act('apiPay', e.getAttribute('data-d'), e.getAttribute('data-r'), on).then(function (ok) { if (ok && on) toast('입금 완료로 표시했어요'); }); },
+  'pay-amt': function (e) { S.sheet = { t: 'payamt', date: e.getAttribute('data-d'), room: e.getAttribute('data-r') }; renderSheet(); },
+  'payamt-save': function (e) { act('apiPayAmt', e.getAttribute('data-d'), e.getAttribute('data-r'), val('pa_amt')).then(function (ok) { if (ok) { S.sheet = null; renderSheet(); toast('금액을 저장했어요'); } }); },
+  'payamt-reset': function (e) { act('apiPayAmt', e.getAttribute('data-d'), e.getAttribute('data-r'), '').then(function (ok) { if (ok) { S.sheet = null; renderSheet(); toast('기본 금액으로 돌렸어요'); } }); },
+  'fee-mon': function (e) { if (e.disabled) return; S.feeMon = shiftMonth(S.feeMon || S.now.today.substr(0, 7), +e.getAttribute('data-n')); render(); },
   'ack-all': function () { act('apiAck', unacked().map(function (c) { return c.id; })); },
   sub: function (e) { S.sub = e.getAttribute('data-v'); S.ask = ''; window.scrollTo(0, 0); render(); },
   ask: function (e) {
@@ -1067,7 +1160,7 @@ document.addEventListener('click', function (ev) {
   while (e && e !== document.body && !(e.getAttribute && e.getAttribute('data-act'))) e = e.parentNode;
   if (!e || e === document.body || !e.getAttribute) return;
   var an = e.getAttribute('data-act'), fn = ACT[an];
-  if (fn && S.cached && !/^(tab|sub|day|mon|cell|close|fs|goto-day|refresh|done|ack|ack-all)$/.test(an)) { toast('새 자료를 불러오는 중이에요. 잠시만요'); return; }
+  if (fn && S.cached && !/^(tab|sub|day|mon|cell|close|fs|goto-day|refresh|done|ack|ack-all|fee-mon)$/.test(an)) { toast('새 자료를 불러오는 중이에요. 잠시만요'); return; }
   if (fn) fn(e, ev);
 });
 document.addEventListener('keydown', function (ev) {
