@@ -93,8 +93,13 @@ table.cal{border-collapse:collapse;width:100%;table-layout:fixed}
 
 .k-stay .cell::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;background:var(--rc);opacity:.5}
 .k-clean .cell{background:var(--rc);color:#0B0D10;font-weight:800}
-.cal td.cx .cell{color:var(--red);font-weight:800;box-shadow:inset 0 0 0 2px var(--red)}
+
+.cal td.cx .cell{color:var(--rc);font-weight:800}
+.cal:not(.adm) td.cx .cell::before{display:none}
+.cal.adm td.k-stay.cx .cell::before{background:linear-gradient(var(--rc) 0 18%,transparent 18% 82%,var(--rc) 82%)}
 .st.cx,.offl.cx{color:var(--red);font-weight:800}
+.offl .rnm{color:var(--rc)}
+.guide{margin:.9rem .875rem 0;font-size:1.05rem;color:var(--tx);text-align:center}
 
 .k-nosame .cell{background:var(--rc);color:#0B0D10;font-weight:800}
 .mk{position:absolute;top:0;right:1px;font-size:.6rem}
@@ -718,12 +723,16 @@ function cardHtml(date, room, c) {
 }
 
 
+function pendingDone(date, cells) {
+  var n = S.now; if (!(date <= n.today && date >= L.addDays(n.today, -2))) return false;
+  return L.ROOM_IDS.some(function (room) { return L.isCleaning(cells[room].k) && !S.D.done[date + '|' + room]; });
+}
 function viewDay() {
-  var date = S.day, cells = dayCells(date), cards = [], off = [], cx = [];
+  var date = S.day, cells = dayCells(date), cards = [], cx = [];
   L.ROOM_IDS.forEach(function (room) {
     var c = cells[room];
     if (L.isCleaning(c.k)) cards.push(cardHtml(date, room, c));
-    else (S.cx[date + '|' + room] ? cx : off).push(h(roomName(room)));
+    else if (S.cx[date + '|' + room]) cx.push('<span class="rnm ' + RC[room] + '">' + h(roomName(room)) + '</span>');
   });
   var out = '<div class="dayhead"><button class="step" data-act="day" data-n="-1" aria-label="전날">‹</button>'
     + '<div class="date">' + L.mdLabel(date) + ' <span>(' + L.wdName(date) + ')</span></div>'
@@ -731,8 +740,9 @@ function viewDay() {
   out += '<div class="summ">' + (cards.length ? '청소 ' + cards.length + '곳' : '청소 없음') + '</div>';
   if (S.role === 'admin' && cards.length) out += '<button class="copy" data-act="copy-day">청소일정 전체 복사</button>';
   out += cards.join('');
+  
+  if (S.role !== 'admin' && pendingDone(date, cells)) out += '<div class="guide">청소를 마친 뒤 \'청소 완료\' 버튼을 눌러 주세요.</div>';
   if (cx.length) out += '<div class="offl cx">청소 취소 · ' + cx.join(' · ') + '</div>';
-  if (off.length && (cards.length || cx.length)) out += '<div class="offl">청소 없음 · ' + off.join(' · ') + '</div>';
   return out;
 }
 
@@ -758,7 +768,7 @@ function viewCal() {
     + '<div class="mtitle">' + (+S.mon.substr(0, 4)) + '년 ' + (+S.mon.substr(5, 2)) + '월</div>'
     + '<button class="step" data-act="mon" data-n="1"' + (S.mon >= maxMon ? ' disabled style="opacity:.25"' : '') + ' aria-label="다음 달">›</button></div>';
   out += '<div class="lgd"><span><i class="solid"></i>청소</span><span><i class="line"></i>당일예약 x</span><span><i class="band"></i>숙박 중</span><span class="cxl"><i class="line"></i>청소 취소</span></div>';
-  out += '<table class="cal"><thead><tr><th class="hd"></th>' + L.ROOM_IDS.map(function (r) { return '<th><span class="rn ' + RC[r] + '">' + ROOM_SHORT[r] + '</span></th>'; }).join('') + '</tr></thead><tbody>';
+  out += '<table class="cal' + (admin ? ' adm' : '') + '"><thead><tr><th class="hd"></th>' + L.ROOM_IDS.map(function (r) { return '<th><span class="rn ' + RC[r] + '">' + ROOM_SHORT[r] + '</span></th>'; }).join('') + '</tr></thead><tbody>';
   days.forEach(function (d) {
     var w = d.wd;
     out += '<tr class="' + (d.date === t ? 'today' : (d.date < t ? 'past' : '')) + '"' + (d.date === t ? ' id="todayrow"' : '') + '><td class="dt ' + (w === '토' ? 'sat' : w === '일' ? 'sun' : '') + '"><b>' + (+d.date.substr(8, 2)) + '</b><span>' + w + '</span></td>';
@@ -783,6 +793,7 @@ function viewChg() {
   var seen = all.filter(function (c) { return c.ack && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 30);
   var out = '<div class="chead"><span>' + (open.length ? '새 추가 일정 ' + open.length + '건' : '새 추가 일정이 없어요') + '</span>' + (open.length > 1 ? '<button class="btn sm" data-act="ack-all">모두 확인</button>' : '') + '</div>';
   out += open.map(chgHtml).join('');
+  if (S.role !== 'admin' && open.length) out += '<div class="guide">내용을 확인하셨으면 \'확인\'을 눌러 주세요.</div>';
   if (seen.length) out += '<div class="secth">확인한 것</div>' + seen.map(chgHtml).join('');
   return out;
 }
