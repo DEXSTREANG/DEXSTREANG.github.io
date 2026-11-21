@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
 <meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>청소 관리</title>
@@ -18,7 +20,10 @@ button{border:0;background:none;padding:0;cursor:pointer}
 .rn{display:inline-block;background:var(--rc);color:#0B0D10;font-weight:800;border-radius:.45rem;padding:.08rem .55rem;white-space:nowrap}
 .top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--ln)}
 .appbar{display:flex;align-items:center;justify-content:space-between;padding:.5rem .875rem .3rem;gap:.5rem}
-.appbar .t{font-size:1.05rem;color:var(--sub)}
+.appbar .t{font-size:1.05rem;color:var(--sub);white-space:nowrap}
+.md{display:inline-block;margin-left:.45rem;font-size:.85rem;font-weight:800;border-radius:.45rem;padding:.05rem .5rem;vertical-align:.06rem}
+.md.a{background:#FFD84D;color:#0B0D10}.md.v{box-shadow:inset 0 0 0 1px var(--sub);color:var(--sub);font-weight:400}
+.gt .md{font-size:1rem;vertical-align:.2rem}
 .tools{display:flex;align-items:center;gap:.4rem}
 .fs{display:flex;border:1px solid var(--ln);border-radius:.55rem;overflow:hidden}
 .fs button{padding:.15rem .5rem;color:var(--sub);line-height:1.4}
@@ -51,7 +56,6 @@ button{border:0;background:none;padding:0;cursor:pointer}
 .twi{flex:0 0 auto;align-self:center}.twi.s{width:1.55rem;height:1.55rem}.twi.b{width:2.25rem;height:2.25rem}
 .c2 .twi.s{width:1.15em;height:1.15em;vertical-align:-.22em}.c2 .twi.b{width:1.65em;height:1.65em;vertical-align:-.45em}
 .tw b{font-size:1.9rem;font-weight:800;color:var(--tx)}
-.tw.g b{font-size:1.2rem;font-weight:400;color:var(--sub)}
 .hint{margin-top:.45rem;font-size:.9rem;color:var(--sub)}
 .memo{margin-top:.55rem;background:var(--pp2);border-radius:.6rem;padding:.5rem .65rem;font-size:1.05rem;word-break:break-all}
 .donebtn{display:block;width:100%;margin-top:.85rem;background:var(--rc);color:#0B0D10;font-weight:800;font-size:1.15rem;border-radius:.8rem;padding:.75rem 0}
@@ -75,7 +79,10 @@ table.cal{border-collapse:collapse;width:100%;table-layout:fixed}
 .cal td.dt span{display:block;font-size:.72rem}
 .cal td:last-child{border-right:0}
 .sat b,.sat span{color:#7DB1FF!important}.sun b,.sun span{color:#FF8787!important}
-.cell{display:flex;width:100%;height:2.9rem;align-items:center;justify-content:center;font-size:min(.9rem,3.8vw);letter-spacing:-.5px;position:relative}
+.cell{display:flex;flex-wrap:wrap;align-content:center;width:100%;height:2.9rem;align-items:center;justify-content:center;font-size:min(.9rem,3.8vw);letter-spacing:-.5px;line-height:1.2;position:relative}
+
+.gc{display:inline-flex;align-items:center;margin-left:.22rem;white-space:nowrap;background:#0B0D10;color:var(--rc);border-radius:.38rem;padding:0 .3rem;font-size:.95em;line-height:1.45}
+.gc i{font-style:normal;font-size:.9em;margin-right:1px;color:transparent;text-shadow:0 0 0 var(--rc)}
 .k-stay .cell{background:var(--ra)}
 .k-clean .cell{background:var(--rc);color:#0B0D10;font-weight:800}
 .cal td.cx .cell{color:var(--red);font-weight:800;box-shadow:inset 0 0 0 2px var(--red)}
@@ -590,18 +597,23 @@ function call(name) {
     r[name].apply(r, args);
   });
 }
-function authObj() { return S.mode === 'admin' ? { a: auth.a } : { v: auth.v, a: auth.a }; }
+
+function authObj() { return S.mode === 'admin' ? { a: auth.a } : (auth.v ? { v: auth.v } : { a: auth.a }); }
 function fail() { toast('연결이 잠시 끊겼어요. 다시 눌러 주세요.'); }
-function take(resp) {
+function take(resp, cached) {
   if (!resp) return false;
   if (resp.ok === false && resp.why === 'auth') {
+    store.set(cacheKey(), '');
+    if (S.mode !== 'admin' && auth.v && auth.a) { auth.v = ''; store.set('cl_v', ''); refresh(); return false; }   
     if (S.mode !== 'admin' && S.k && !S.kTried) { loginK(); return false; }
-    S.gate = resp; S.D = null; S.sheet = null; render(); return false;
+    S.gate = resp; S.D = null; S.sheet = null; S.cached = false; render(); return false;
   }
   if (resp.ok === false) { toast(resp.why || '처리하지 못했어요'); return false; }
   if (resp.token) { auth.a = resp.token; store.set('cl_a', resp.token); }
   if (resp.data) {
-    S.D = resp.data; S.A = resp.admin || null; S.now = resp.now; S.role = resp.role; S.gate = null;
+    var adm = S.mode === 'admin';
+    S.D = resp.data; S.A = adm ? (resp.admin || null) : null; S.now = resp.now; S.role = adm ? resp.role : 'vendor'; S.gate = null;
+    S.cached = !!cached; if (!cached) saveCache(resp);
     S.cx = {}; (S.D.cx || []).forEach(function (k) { S.cx[k] = 1; });   
     if (!S.day) S.day = S.now.today;
     if (S.tab === 'today') S.day = S.now.today;
@@ -612,7 +624,31 @@ function take(resp) {
   render();
   return true;
 }
-function refresh() { return call('apiLoad', authObj()).then(take, fail); }
+
+var SEQ = 0, lastWrite = 0;
+function refresh() { var my = ++SEQ; return call('apiLoad', authObj()).then(function (r) { return my < lastWrite ? false : take(r); }, fail); }
+
+function cacheKey() { return 'cl_c_' + (S.mode === 'admin' ? 'a' : 'v'); }
+function saveCache(resp) {
+  if (PREVIEW) return;
+  try {
+    var d = JSON.parse(JSON.stringify(resp.data)), a = null;
+    Object.keys(d.rooms || {}).forEach(function (r) { if (d.rooms[r].pw) d.rooms[r].pw = '…'; });
+    if (S.mode === 'admin' && resp.admin) { a = JSON.parse(JSON.stringify(resp.admin)); a.out = []; }
+    store.set(cacheKey(), JSON.stringify({ ver: 1, at: Date.now(), stamp: resp.now.stamp, role: S.role, data: d, admin: a }));
+  } catch (e) {}
+}
+function showCache() {
+  if (PREVIEW) return false;
+  try {
+    var c = JSON.parse(store.get(cacheKey()) || 'null');
+    if (!c || c.ver !== 1 || !c.data || !c.data.res || !c.stamp || Date.now() - c.at > 3 * 864e5 || Date.now() < c.at) return false;
+    if (S.mode === 'admin' ? !(auth.a && c.admin && c.role === 'admin') : !(auth.v || auth.a)) return false;
+    var k = new Date(Date.now() + 9 * 3600e3);   
+    var today = k.getUTCFullYear() + '-' + L.pad2(k.getUTCMonth() + 1) + '-' + L.pad2(k.getUTCDate());
+    return take({ ok: true, data: c.data, admin: c.admin, role: c.role, now: { today: today, nowMin: k.getUTCHours() * 60 + k.getUTCMinutes(), stamp: c.stamp } }, true);
+  } catch (e) { return false; }
+}
 function loginK() {
   S.kTried = true;
   return call('apiLogin', 'vendor', S.k).then(function (r) {
@@ -623,8 +659,8 @@ function loginK() {
   }, fail);
 }
 function act(name) {
-  var args = [name, authObj()].concat(Array.prototype.slice.call(arguments, 1));
-  return call.apply(null, args).then(take, function () { fail(); return false; });
+  var args = [name, authObj()].concat(Array.prototype.slice.call(arguments, 1)), my = ++SEQ;
+  return call.apply(null, args).then(function (r) { if (r && r.data) lastWrite = Math.max(lastWrite, my); return take(r); }, function () { fail(); return false; });
 }
 
 
@@ -646,11 +682,11 @@ function ico(t) { return h(t).split('작은수건 ').join(TW_S + ' ').split('큰
 var STATE = { clean: '청소', nosame: '당일예약 x', stay: '숙박 중', empty: '빈 방' };
 function num(i, v, unit, cls) { return '<span class="tw' + (cls || '') + '"><i>' + i + '</i><b>' + (v == null ? '-' : v) + '</b>' + (unit || '') + '</span>'; }
 function cardHtml(date, room, c) {
-  var info = S.D.rooms[room], n = S.now, admin = S.role === 'admin', on = L.isCleaning(c.k), cx = !on && S.cx[date + '|' + room];
+  var info = S.D.rooms[room], n = S.now, on = L.isCleaning(c.k), cx = !on && S.cx[date + '|' + room];
   var out = '<div class="card ' + RC[room] + (on ? '' : ' off') + '"><div class="ch"><span class="rn ' + RC[room] + '">' + h(info.name) + '</span><span class="st' + (cx ? ' cx' : '') + '">' + (cx ? '청소 취소' : (STATE[c.k] || '')) + '</span>' + (on ? '<span class="pw">' + IC.key + ' ' + h(info.pw || '') + '</span>' : '') + '</div>';
-  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small) + num(TW_B, c.big) + (admin ? num(IC.guest, c.g, '', ' g') : '') + '</div>';
-  else if (c.k === 'nosame') out += '<div class="nums">' + num(TW_S, c.small) + num(TW_B, c.big) + (admin && c.next ? num(IC.guest, c.next.g, '', ' g') : '') + '</div>';
-  else if (c.k === 'stay') { var st = stayOf(room, date); if (st) out += '<div class="hint">' + L.mdwLabel(st.checkin) + ' ~ ' + L.mdwLabel(st.checkout) + (admin ? ' · ' + IC.guest + ' ' + st.guests : '') + '</div>'; }
+  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small) + num(TW_B, c.big) + '</div>';
+  else if (c.k === 'nosame') out += '<div class="nums">' + num(TW_S, c.small) + num(TW_B, c.big) + '</div>';
+  else if (c.k === 'stay') { var st = stayOf(room, date); if (st) out += '<div class="hint">' + L.mdwLabel(st.checkin) + ' ~ ' + L.mdwLabel(st.checkout) + '</div>'; }
   if (on && c.notes && c.notes.length) out += '<div class="memo">' + c.notes.map(function (t) { return IC.note + ' ' + h(t); }).join('<br>') + '</div>';
   if (on && date <= n.today && date >= L.addDays(n.today, -2)) {
     var at = S.D.done[date + '|' + room];
@@ -691,7 +727,7 @@ function shiftMonth(ym, n) {
   return y + '-' + L.pad2(m);
 }
 function viewCal() {
-  var rg = monthRange(S.mon), days = board(rg[0], rg[1]), t = S.now.today;
+  var rg = monthRange(S.mon), days = board(rg[0], rg[1]), t = S.now.today, admin = S.role === 'admin';
   var minMon = shiftMonth(t.substr(0, 7), -1), maxMon = shiftMonth(t.substr(0, 7), 12);
   var out = '<div class="monthbar"><button class="step" data-act="mon" data-n="-1"' + (S.mon <= minMon ? ' disabled style="opacity:.25"' : '') + ' aria-label="지난달">‹</button>'
     + '<div class="mtitle">' + (+S.mon.substr(0, 4)) + '년 ' + (+S.mon.substr(5, 2)) + '월</div>'
@@ -704,7 +740,7 @@ function viewCal() {
     L.ROOM_IDS.forEach(function (room) {
       var c = d.cells[room], on = L.isCleaning(c.k), cx = !on && S.cx[d.date + '|' + room];
       var mk = on ? ((S.D.done[d.date + '|' + room] ? '✅' : '') + (c.notes && c.notes.length ? IC.note : '')) : '';
-      out += '<td class="' + RC[room] + ' k-' + c.k + (cx ? ' cx' : '') + '"><button class="cell" data-act="cell" data-d="' + d.date + '" data-r="' + room + '">' + (c.k === 'clean' ? '청소' : c.k === 'nosame' ? '당일예약x' : cx ? '청소 취소' : '') + (mk ? '<span class="mk">' + mk + '</span>' : '') + '</button></td>';
+      out += '<td class="' + RC[room] + ' k-' + c.k + (cx ? ' cx' : '') + '"><button class="cell" data-act="cell" data-d="' + d.date + '" data-r="' + room + '">' + (c.k === 'clean' ? '청소' + (admin ? '<span class="gc"><i>' + IC.guest + '</i>' + c.g + '</span>' : '') : c.k === 'nosame' ? '당일예약x' : cx ? '청소 취소' : '') + (mk ? '<span class="mk">' + mk + '</span>' : '') + '</button></td>';
     });
     out += '</tr>';
   });
@@ -811,8 +847,9 @@ function viewAdmin() {
 }
 
 
+function modeTag() { return S.mode === 'admin' ? '<span class="md a">관리용</span>' : '<span class="md v">업체용</span>'; }
 function gateHtml() {
-  var g = S.gate, head = '<div class="gate"><div class="gt">청소 관리</div>';
+  var g = S.gate, head = '<div class="gate"><div class="gt">청소 관리' + modeTag() + '</div>';
   if (!g) return head + '<div class="gs">불러오는 중…</div></div>';
   var err = '<div class="err">' + h(S.err) + '</div>';
   if (S.mode === 'admin') {
@@ -826,7 +863,7 @@ function topHtml() {
   var n = unacked().length, admin = S.role === 'admin', t0 = S.now.today, t1 = L.addDays(t0, 1);
   var lab = function (d, w) { return '<small>' + w + '</small>' + (+d.substr(8, 2)) + '일 (' + L.wdName(d) + ')'; };
   var tabs = [['today', lab(t0, '오늘')], ['tomorrow', lab(t1, '내일')], ['cal', '캘린더'], ['chg', '추가 일정']];
-  return '<div class="top" id="top"><div class="appbar"><div class="t">청소 관리</div><div class="tools">'
+  return '<div class="top" id="top"><div class="appbar"><div class="t">청소 관리' + modeTag() + '</div><div class="tools">'
     + (admin ? '<button class="ic' + (S.tab === 'admin' ? ' on' : '') + '" data-act="tab" data-v="admin">관리' + (S.A.todo.length ? ' ' + S.A.todo.length : '') + '</button>' : '')
     + '<div class="fs" aria-label="글자 크기">' + [1, 2, 3].map(function (i) { return '<button class="s' + i + (S.fs === i ? ' on' : '') + '" data-act="fs" data-v="' + i + '">가</button>'; }).join('') + '</div>'
     + '<button class="ic" data-act="refresh" aria-label="새로 고침">↻</button></div></div>'
@@ -834,6 +871,7 @@ function topHtml() {
     + '<div class="busy" id="busy"></div></div>';
 }
 function footHtml() {
+  if (S.cached) return '<div class="foot">' + fmtTs(S.now.stamp) + ' 화면이에요<br>새 자료를 불러오는 중…</div>';
   return '<div class="foot">' + fmtTs(S.now.stamp) + ' 기준' + (S.D.tick ? ' · 예약 자동 확인 ' + fmtTs(S.D.tick) : '') + '<br>10분마다 자동으로 새로 맞춰져요.</div>';
 }
 function paintBusy() { var b = el('busy'); if (b) b.className = 'busy' + (S.busy > 0 ? ' on' : ''); }
@@ -993,7 +1031,8 @@ document.addEventListener('click', function (ev) {
   var e = ev.target;
   while (e && e !== document.body && !(e.getAttribute && e.getAttribute('data-act'))) e = e.parentNode;
   if (!e || e === document.body || !e.getAttribute) return;
-  var fn = ACT[e.getAttribute('data-act')];
+  var an = e.getAttribute('data-act'), fn = ACT[an];
+  if (fn && S.cached && !/^(tab|sub|day|mon|cell|close|fs|goto-day|refresh|done|ack|ack-all)$/.test(an)) { toast('새 자료를 불러오는 중이에요. 잠시만요'); return; }
   if (fn) fn(e, ev);
 });
 document.addEventListener('keydown', function (ev) {
@@ -1007,7 +1046,9 @@ function start(mode, k) {
   S.k = k ? String(k) : ''; S.kTried = false;
   if (S.mode === 'admin') { S.tab = 'admin'; }
   var f = +store.get('cl_fs'); if (f >= 1 && f <= 3) S.fs = f;
+  document.title = '청소 관리 · ' + (S.mode === 'admin' ? '관리용' : '업체용');
   render();
+  showCache();
   if (S.mode !== 'admin' && S.k && !auth.v && !auth.a) loginK(); else refresh();
   setInterval(function () {
     var typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
