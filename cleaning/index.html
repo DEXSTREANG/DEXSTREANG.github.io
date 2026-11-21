@@ -9,7 +9,12 @@
 <meta name="color-scheme" content="dark">
 <meta name="darkreader-lock">
 <title>청소 관리</title>
-<style>
+<script>(function(){function bad(n){if(n.nodeType!==1)return false;var t=n.tagName;if(t==='STYLE')return n.id!=='own';if(t==='LINK')return /stylesheet/i.test(n.rel||'');return false}
+function clean(el){if(!el||el.nodeType!==1)return;var a=el.attributes;for(var i=a.length-1;i>=0;i--){var k=a[i].name;if(/darkreader|dark-mode|darkmode/i.test(k))el.removeAttribute(k)}if(el.style&&el.style.length){for(var j=el.style.length-1;j>=0;j--){var q=el.style[j];if(/^--darkreader/.test(q))el.style.removeProperty(q)}if(el===document.documentElement||el===document.body){el.style.removeProperty('filter');el.style.removeProperty('background-color');el.style.removeProperty('color')}}}
+function sweep(){var l=document.querySelectorAll('style,link[rel~=stylesheet]');for(var i=0;i<l.length;i++)if(bad(l[i]))l[i].remove();clean(document.documentElement);clean(document.body);var d=document.querySelectorAll('[data-darkreader-inline-bgcolor],[data-darkreader-inline-color],[data-darkreader-inline-fill],[data-darkreader-inline-stroke],[data-darkreader-inline-bgimage]');for(var k=0;k<d.length;k++)clean(d[k])}
+new MutationObserver(function(ms){var f=false;for(var i=0;i<ms.length;i++){var m=ms[i];if(m.type==='attributes'){if(/darkreader|dark/i.test(m.attributeName)||m.attributeName==='style')clean(m.target)}else for(var j=0;j<m.addedNodes.length;j++){var n=m.addedNodes[j];if(bad(n)){n.remove()}}}}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','data-darkreader-mode','data-darkreader-scheme']});
+document.addEventListener('DOMContentLoaded',sweep);window.addEventListener('load',sweep);setTimeout(sweep,1500);setTimeout(sweep,4000)})();</script>
+<style id="own">
 :root{--bg:#0E1014;--pp:#171A20;--pp2:#20242C;--ln:#2C313B;--tx:#E6E9EE;--sub:#98A1AE;--red:#FF6B6B;--grn:#40C980;--ink:#E6E9EE;--line:#2C313B;--green:#40C980;--teal:#E6E9EE;--topH:6rem}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:16px;-webkit-text-size-adjust:100%;background:var(--bg);color-scheme:dark}
@@ -1203,6 +1208,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-22h';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-22i';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
