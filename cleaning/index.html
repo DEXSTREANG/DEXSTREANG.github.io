@@ -56,7 +56,9 @@ button{border:0;background:none;padding:0;cursor:pointer}
 .twi{flex:0 0 auto;align-self:center}.twi.s{width:1.55rem;height:1.55rem}.twi.b{width:2.25rem;height:2.25rem}
 .c2 .twi.s{width:1.15em;height:1.15em;vertical-align:-.22em}.c2 .twi.b{width:1.65em;height:1.65em;vertical-align:-.45em}
 .tw b{font-size:1.9rem;font-weight:800;color:var(--tx)}
-.tw.g b{font-size:1.2rem;font-weight:400;color:var(--sub)}
+
+.tw.g i{font-size:1.5rem}
+.tw.g b{color:var(--sub)}
 
 .tw.gv i{font-size:1.5rem;color:transparent;text-shadow:0 0 0 var(--rc)}
 .hint{margin-top:.45rem;font-size:.9rem;color:var(--sub)}
@@ -84,11 +86,12 @@ table.cal{border-collapse:collapse;width:100%;table-layout:fixed}
 .sat b,.sat span{color:#7DB1FF!important}.sun b,.sun span{color:#FF8787!important}
 .cell{display:flex;flex-wrap:wrap;align-content:center;width:100%;height:2.9rem;align-items:center;justify-content:center;font-size:min(.9rem,3.8vw);letter-spacing:-.5px;line-height:1.2;position:relative}
 
-.gc{display:inline-flex;align-items:center;margin-left:.22rem;white-space:nowrap;background:#0B0D10;color:var(--rc);border-radius:.38rem;padding:0 .3rem;font-size:.95em;line-height:1.45}
-.gc i{font-style:normal;font-size:.9em;margin-right:1px;color:transparent;text-shadow:0 0 0 var(--rc)}
+.gn{white-space:nowrap}
+.gn i{font-style:normal;margin-right:2px;color:transparent;text-shadow:0 0 0 #0B0D10}
 .brk{flex-basis:100%;height:0}
-.brk+.gc{margin-left:0;margin-top:2px}
-.k-stay .cell{background:var(--ra)}
+.brk+.gn{margin-top:1px}
+
+.k-stay .cell::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;background:var(--rc);opacity:.5}
 .k-clean .cell{background:var(--rc);color:#0B0D10;font-weight:800}
 .cal td.cx .cell{color:var(--red);font-weight:800;box-shadow:inset 0 0 0 2px var(--red)}
 .st.cx,.offl.cx{color:var(--red);font-weight:800}
@@ -745,7 +748,7 @@ function shiftMonth(ym, n) {
 }
 
 function calClean(c, admin) {
-  return '청소<span class="gc">' + c.n + '박</span>' + (admin ? '<span class="brk"></span><span class="gc"><i>' + IC.guest + '</i>' + c.g + '</span>' : '');
+  return '청소 ' + c.n + '박' + (admin ? '<span class="brk"></span><span class="gn"><i>' + IC.guest + '</i>' + c.g + '</span>' : '');
 }
 function viewCal() {
   var rg = monthRange(S.mon), days = board(rg[0], rg[1]), t = S.now.today, admin = S.role === 'admin';
