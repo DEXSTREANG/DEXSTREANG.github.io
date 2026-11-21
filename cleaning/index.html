@@ -219,12 +219,15 @@ function cutoffPassed(date, now) {
 
 var SMALL_CAP = { '와우산로': 30 };
 var SMALL_CAP_DEFAULT = 25;
+
 function smallTowels(room, g, n) {
   var cap = SMALL_CAP[room] || SMALL_CAP_DEFAULT;
   if (!(g > 0) || !(n > 0)) return g * n;
-  if (g * n <= cap) return g * n;
-  return g * Math.max(1, Math.min(n, Math.floor(cap / g)));
+  var per = n === 1 ? 2 : n;
+  if (g * per <= cap) return g * per;
+  return g * Math.max(1, Math.min(per, Math.floor(cap / g)));
 }
+function bigTowels(g, n) { return n === 1 ? 0 : g; }
 function computeCell(date, rs, now) {
   var co = null, ci = null, stay = false;
   for (var i = 0; i < rs.length; i++) {
@@ -234,11 +237,11 @@ function computeCell(date, rs, now) {
     if (r.checkin < date && date < r.checkout) stay = true;
   }
   var n, g;
-  if (ci && (co || (!stay && !cutoffPassed(date, now)))) { n = nightsOf(ci); g = Number(ci.guests); return { k: 'clean', g: g, n: n, small: smallTowels(ci.room, g, n), big: g }; }
+  if (ci && (co || (!stay && !cutoffPassed(date, now)))) { n = nightsOf(ci); g = Number(ci.guests); return { k: 'clean', g: g, n: n, small: smallTowels(ci.room, g, n), big: bigTowels(g, n) }; }
   if (ci || stay) return { k: 'stay' };
   if (co) {
     var nx = nextResAfter(rs, date), c = { k: 'nosame' };
-    if (nx) { n = nightsOf(nx); g = Number(nx.guests); c.next = { date: nx.checkin, g: g, n: n }; c.small = smallTowels(nx.room, g, n); c.big = g; }
+    if (nx) { n = nightsOf(nx); g = Number(nx.guests); c.next = { date: nx.checkin, g: g, n: n }; c.small = smallTowels(nx.room, g, n); c.big = bigTowels(g, n); }
     return c;
   }
   return { k: 'empty' };
@@ -558,7 +561,7 @@ function planMail(p, all) {
 var LOGIC = {
   ICON: ICON, ROOM_IDS: ROOM_IDS, SMALL_ROOMS: SMALL_ROOMS, pad2: pad2, addDays: addDays, diffDays: diffDays, wdName: wdName, mdLabel: mdLabel,
   mdwLabel: mdwLabel, isYmd: isYmd, makeYmd: makeYmd, isActive: isActive, activeRes: activeRes, findConflicts: findConflicts,
-  computeCell: computeCell, smallTowels: smallTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
+  computeCell: computeCell, smallTowels: smallTowels, bigTowels: bigTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
   cellSig: cellSig, describeCell: describeCell, diffBoard: diffBoard, noticeText: noticeText, splitText: splitText,
   parseMail: parseMail, planMail: planMail, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten
 };
