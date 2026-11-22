@@ -9,6 +9,11 @@
 <meta name="color-scheme" content="dark">
 <meta name="darkreader-lock">
 <title>청소 관리</title>
+<meta name="theme-color" content="#0E1014">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<script>(function(){var a=/(^|[?&])p=admin(&|$)/.test(location.search),t=a?'a':'v',d=document;function L(r,h,z){var l=d.createElement('link');l.rel=r;l.href=h;if(z)l.setAttribute('sizes',z);d.head.appendChild(l)}L('manifest','manifest-'+t+'.webmanifest');L('apple-touch-icon','icon-'+t+'-180.png','180x180');L('icon','icon-'+t+'-192.png','192x192');var m=d.createElement('meta');m.name='apple-mobile-web-app-title';m.content=a?'청소 관리자':'청소 관리';d.head.appendChild(m)})();</script>
 <script>(function(){function bad(n){if(n.nodeType!==1)return false;var t=n.tagName;if(t==='STYLE')return n.id!=='own';if(t==='LINK')return /stylesheet/i.test(n.rel||'');return false}
 function clean(el){if(!el||el.nodeType!==1)return;var a=el.attributes;for(var i=a.length-1;i>=0;i--){var k=a[i].name;if(/darkreader|dark-mode|darkmode/i.test(k))el.removeAttribute(k)}if(el.style&&el.style.length){for(var j=el.style.length-1;j>=0;j--){var q=el.style[j];if(/^--darkreader/.test(q))el.style.removeProperty(q)}if(el===document.documentElement||el===document.body){el.style.removeProperty('filter');el.style.removeProperty('background-color');el.style.removeProperty('color')}}}
 function sweep(){var l=document.querySelectorAll('style,link[rel~=stylesheet]');for(var i=0;i<l.length;i++)if(bad(l[i]))l[i].remove();clean(document.documentElement);clean(document.body);var d=document.querySelectorAll('[data-darkreader-inline-bgcolor],[data-darkreader-inline-color],[data-darkreader-inline-fill],[data-darkreader-inline-stroke],[data-darkreader-inline-bgimage]');for(var k=0;k<d.length;k++)clean(d[k])}
@@ -922,10 +927,10 @@ function adminNotes() {
   return out;
 }
 function adminOut() {
-  var set = S.A.set, out = '<div class="box"><p style="margin:0">오늘·내일 청소가 바뀌면 <b>단톡방에 그대로 전달할 글</b>이 여기 쌓여요.' + (set.kakaoOn ? ' 사장님 카카오톡(나와의 채팅)으로도 같이 보내요.' : ' 복사해서 쓰면 돼요.') + '</p></div>';
+  var set = S.A.set, out = '<div class="box"><p style="margin:0">오늘·내일 청소가 바뀌면 <b>단톡방에 그대로 전달할 글</b>이 여기 쌓여요.' + (set.tgOn ? ' 사장님 텔레그램으로도 같이 보내요.' : set.kakaoOn ? ' 사장님 카카오톡(나와의 채팅)으로도 같이 보내요.' : ' 복사해서 쓰면 돼요.') + '</p></div>';
   out += S.A.out.map(function (o, i) {
     var fw = o.kind === '전달';
-    return '<div class="box"' + (fw && !o.sent ? ' style="border-color:var(--ink)"' : '') + '><div><span class="tag ' + (fw ? 't' : '') + '">' + (fw ? '단톡방 전달용' : '사장님 알림') + '</span>' + (set.kakaoShow ? '<span class="tag ' + (o.kakao === 'Y' ? 'g' : o.kakao === 'N' ? 'r' : '') + '">' + (o.kakao === 'Y' ? '카톡으로 보냄' : o.kakao === 'N' ? '카톡 전송 실패' : '카톡 연결 전') + '</span>' : '') + '<span style="font-size:.85rem;color:var(--sub)">' + fmtTs(o.ts) + '</span></div><pre class="txt">' + h(o.text) + '</pre>'
+    return '<div class="box"' + (fw && !o.sent ? ' style="border-color:var(--ink)"' : '') + '><div><span class="tag ' + (fw ? 't' : '') + '">' + (fw ? '단톡방 전달용' : '사장님 알림') + '</span>' + (set.tgOn || set.kakaoShow ? '<span class="tag ' + (o.kakao === 'Y' ? 'g' : o.kakao === 'N' ? 'r' : '') + '">' + (o.kakao === 'Y' ? '알림 보냄' : o.kakao === 'N' ? '알림 전송 실패' : '알림 연결 전') + '</span>' : '') + '<span style="font-size:.85rem;color:var(--sub)">' + fmtTs(o.ts) + '</span></div><pre class="txt">' + h(o.text) + '</pre>'
       + '<div class="row"><button class="btn sm teal" data-act="copy-out" data-i="' + i + '">복사</button>' + (fw ? '<button class="btn sm' + (o.sent ? ' fill' : '') + '" data-act="out-sent" data-id="' + h(o.id) + '" data-on="' + (o.sent ? '0' : '1') + '">' + (o.sent ? '✔ 전달함' : '전달했어요') + '</button>' : '') + '</div></div>';
   }).join('') || '<div class="none">아직 쌓인 글이 없어요</div>';
   return out;
@@ -941,6 +946,9 @@ function adminSet() {
   out += '<div class="box"><h3>예약 메일 자동 읽기</h3><p>아고다 · 부킹 · 에어비앤비 · 트립닷컴이 보낸 예약 메일만 10분마다 읽어서 장부에 넣어요.<br>마지막 자동 실행: ' + (set.lastTick ? fmtTs(set.lastTick) : '아직 없음') + ' · 마지막 메일 확인: ' + (set.lastMail ? fmtTs(set.lastMail) : '아직 없음') + '</p>'
     + '<div class="row"><button class="btn sm' + (set.mailOn ? ' fill' : '') + '" data-act="mail-toggle">' + (set.mailOn ? '자동 읽기 켜짐' : '자동 읽기 꺼짐') + '</button><button class="btn sm" data-act="run-now">지금 확인</button><button class="btn sm" data-act="mail-test">메일 읽기 점검</button></div>'
     + (S.A.mail.length ? '<div style="margin-top:.6rem">' + S.A.mail.map(function (m) { return '<div class="rr"><div class="a" style="font-size:.9rem">' + h(m.subject) + '<small>' + fmtTs(m.ts) + ' · ' + h(m.note || m.op) + '</small></div></div>'; }).join('') + '</div>' : '') + '</div>';
+  out += '<div class="box"><h3>텔레그램 알림</h3><p>' + (set.tgOn ? '연결됨' + (set.tgBot ? ' (@' + h(set.tgBot) + ')' : '') + ' — 할 일 · 오늘·내일 청소 변경 · 오후 3시까지 청소 완료가 안 눌린 방을 사장님 텔레그램으로 보내요.' : set.tgToken ? '봇 토큰은 저장돼 있어요. 텔레그램에서 봇에게 \'시작\'을 누른 뒤 \'연결하기\'를 눌러 주세요.' : '아직 연결 전이에요.') + '</p>'
+    + '<label class="fld">봇 토큰' + (set.tgToken ? ' (저장돼 있음 — 바꿀 때만 입력)' : '') + '<input id="s_tg" type="password" autocomplete="off" placeholder="BotFather가 준 토큰"></label>'
+    + '<div class="row"><button class="btn sm fill" data-act="tg-save">토큰 저장</button><button class="btn sm" data-act="tg-link">연결하기</button>' + (set.tgOn ? '<button class="btn sm" data-act="tg-test">시험 알림</button>' : '') + '</div></div>';
   if (set.kakaoShow) out += '<div class="box"><h3>카카오톡 (나에게 보내기)</h3><p>' + (set.kakaoOn ? '연결됨 — 급한 변경 글이 사장님 카카오톡으로 와요.' : '아직 연결 전이에요.') + '</p><label class="fld">카카오 앱 REST API 키' + (set.kakaoKey ? ' (저장돼 있음 — 바꿀 때만 입력)' : '') + '<input id="s_kkey" autocomplete="off"></label>'
     + '<div class="row"><button class="btn sm fill" data-act="kkey-save">키 저장</button><button class="btn sm" data-act="kakao-go">카카오톡 연결하기</button>' + (set.kakaoOn ? '<button class="btn sm" data-act="kakao-test">시험 글 보내기</button>' : '') + '</div></div>';
   out += '<div class="box"><h3>전달 글 첫 줄</h3><label class="fld">청소가 추가될 때<input id="s_h1" value="' + h(set.heads.add) + '"></label><label class="fld">내용이 바뀔 때<input id="s_h2" value="' + h(set.heads.change) + '"></label><label class="fld">청소가 취소될 때<input id="s_h3" value="' + h(set.heads.cancel) + '"></label><div class="row"><button class="btn sm fill" data-act="heads-save">저장</button></div></div>';
@@ -1152,6 +1160,9 @@ var ACT = {
   'mail-test': function () { call('apiMailTest', authObj()).then(function (r) { if (r && r.ok) { S.sheet = { t: 'mailtest', list: r.list }; renderSheet(); } else take(r); }, fail); },
   'kkey-save': function () { act('apiSettings', { kakaoKey: val('s_kkey') }).then(function (ok) { if (ok) toast('저장했어요'); }); },
   'kakao-go': function () { call('apiKakaoUrl', authObj()).then(function (r) { if (r && r.ok) { try { window.open(r.url, '_blank'); } catch (e) {} } else take(r); }, fail); },
+  'tg-save': function () { var v = val('s_tg'); if (!v) { toast('토큰을 넣어 주세요'); return; } act('apiSettings', { tgToken: v }).then(function (ok) { if (ok) toast('저장했어요'); }); },
+  'tg-link': function () { act('apiTgLink').then(function (ok) { if (ok) toast('텔레그램으로 확인 글을 보냈어요'); }); },
+  'tg-test': function () { call('apiTgTest', authObj()).then(function (r) { toast(r && r.sent ? '텔레그램으로 보냈어요' : '보내지 못했어요'); }, fail); },
   'kakao-test': function () { call('apiKakaoTest', authObj()).then(function (r) { toast(r && r.sent ? '카카오톡으로 보냈어요' : '보내지 못했어요'); }, fail); },
   'heads-save': function () { act('apiSettings', { headAdd: val('s_h1'), headChange: val('s_h2'), headCancel: val('s_h3') }).then(function (ok) { if (ok) toast('저장했어요'); }); },
   login: function () {
@@ -1217,6 +1228,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-22p';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-22r';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
