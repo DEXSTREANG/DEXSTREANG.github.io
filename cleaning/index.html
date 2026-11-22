@@ -187,6 +187,20 @@ pre.txt{margin:.4rem 0 0;background:var(--bg);border-radius:.6rem;padding:.6rem 
 .gate .btn{display:block;width:100%;max-width:20rem;margin:.8rem auto 0;font-size:1.2rem;padding:.75rem}
 .err{color:var(--red);margin-top:.7rem;min-height:1.5rem}
 .foot{padding:1rem .875rem;font-size:.8rem;color:var(--sub);text-align:center;line-height:1.5}
+.ins{margin:.6rem .875rem 0;padding:.62rem .75rem;background:var(--pp);border:1px solid var(--ln);border-radius:.8rem;display:flex;align-items:center;gap:.6rem}
+.ins>svg{flex:none;width:1.6rem;height:1.6rem;color:var(--tx)}
+.ins .w{flex:1;min-width:0;line-height:1.35}
+.ins .w b{display:block;color:var(--tx);font-size:.9rem;font-weight:700}
+.ins .w small{display:block;color:var(--sub);font-size:.78rem}
+.ins .go{flex:none;background:var(--tx);color:var(--bg);border-radius:.6rem;padding:.56rem .875rem;font-weight:700;font-size:.875rem}
+.ins .nx{flex:none;color:#5D6573;font-size:1.15rem;line-height:1;padding:.3rem .15rem}
+.isub{margin:0 0 .4rem;color:var(--sub);font-size:.82rem}
+.ist{display:flex;align-items:center;gap:.75rem;padding:.7rem 0;border-top:1px solid var(--ln)}
+.ist .no{width:1.5rem;height:1.5rem;border-radius:50%;border:1px solid #5D6573;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex:none}
+.ist .ib{width:2.5rem;height:2.5rem;border-radius:.6rem;background:var(--pp2);display:flex;align-items:center;justify-content:center;flex:none;color:var(--tx)}
+.ist .ib svg{width:1.4rem;height:1.4rem}
+.ist .tx{line-height:1.35}.ist .tx b{display:block;font-size:.95rem}.ist .tx small{display:block;color:var(--sub);font-size:.78rem}
+.iarr{font-size:1.6rem;line-height:1;margin:.5rem 0 0 1.6rem;color:var(--tx)}
 #pv{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#000;color:var(--sub);font-size:12px;line-height:1.35;border-top:1px solid var(--ln)}
 #pv .in{max-width:520px;margin:0 auto;padding:6px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
 #pv b{color:var(--tx)}
@@ -1016,6 +1030,55 @@ function footHtml() {
   if (S.cached) return '<div class="foot">' + fmtTs(S.now.stamp) + ' 화면이에요<br>새 자료를 불러오는 중…</div>';
   return '<div class="foot">' + fmtTs(S.now.stamp) + ' 기준' + (S.D.tick ? ' · 예약 자동 확인 ' + fmtTs(S.D.tick) : '') + '<br>10분마다 자동으로 새로 맞춰져요.</div>';
 }
+
+var INS = (function () {
+  var ua = navigator.userAgent || '';
+  var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), and = /Android/.test(ua);
+  var kakao = /KAKAOTALK/i.test(ua), inapp = kakao || /NAVER\(|Instagram|FBAN|FBAV|Line\/|DaumApps|; wv\)/i.test(ua);
+  return { ios: ios, and: and, kakao: kakao, inapp: inapp, crios: /CriOS/.test(ua), otherIos: /FxiOS|EdgiOS|Whale|OPiOS|YaBrowser/.test(ua), samsung: /SamsungBrowser/.test(ua), prompt: null };
+})();
+function insStandalone() { try { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; } catch (e) { return false; } }
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); INS.prompt = e; });
+window.addEventListener('appinstalled', function () { store.set('cl_ins_x', '1'); if (S.D) render(); });
+var INSIC = {
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.6"/><path d="M12 8.5v6M9 11.5h6"/><path d="M10.5 18.5h3"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h12M4 17h14"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>',
+  web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/></svg>'
+};
+function insHtml() {
+  if (!(INS.ios || INS.and) || insStandalone() || store.get('cl_ins_x')) return '';
+  var sub = INS.kakao ? '카톡에선 안 돼요 · 누르면 브라우저로 열려요' : '아이콘으로 앱처럼 바로 열려요';
+  return '<div class="ins">' + INSIC.phone + '<div class="w"><b>홈 화면에 추가</b><small>' + sub + '</small></div>'
+    + '<button class="go" data-act="ins-go">추가하기</button><button class="nx" data-act="ins-x" aria-label="닫기">✕</button></div>';
+}
+function insSheet() {
+  var st = function (n, ic, t, s) { return '<div class="ist"><div class="no">' + n + '</div><div class="ib">' + ic + '</div><div class="tx"><b>' + t + '</b><small>' + s + '</small></div></div>'; };
+  var sub, steps, arr = '';
+  if (INS.ios && (INS.inapp || INS.otherIos)) {
+    sub = '이 앱 안에서는 추가가 안 돼요';
+    steps = st(1, INSIC.dots, '메뉴에서 \'Safari로 열기\' 누르기', '화면 위나 아래의 ⋯ 또는 공유 메뉴에 있어요') + st(2, INSIC.plus, '사파리에서 \'추가하기\' 다시 누르기', '그다음 순서를 알려 드려요');
+  } else if (INS.ios && INS.crios) {
+    sub = '아이폰 크롬 · 한 번만 하면 돼요';
+    steps = st(1, INSIC.share, '주소창 오른쪽 공유 누르기', '네모에 위쪽 화살표 모양') + st(2, INSIC.plus, '홈 화면에 추가 → 추가', '안 보이면 아래로 내리거나 더 보기');
+  } else if (INS.ios) {
+    sub = '아이폰 사파리 · 한 번만 하면 돼요';
+    steps = st(1, INSIC.menu, '아래 주소창 왼쪽 ≡ 누르기', '≡가 없으면 공유 버튼을 바로 누르세요') + st(2, INSIC.share, '공유 누르기', '네모에 위쪽 화살표 모양') + st(3, INSIC.plus, '홈 화면에 추가 → 추가', '안 보이면 위로 올리거나 더 보기');
+    arr = '<div class="iarr">↓</div>';
+  } else if (INS.inapp) {
+    sub = '이 앱 안에서는 추가가 안 돼요';
+    steps = st(1, INSIC.dots, '오른쪽 위 ⋮ → 다른 브라우저로 열기', '크롬이나 삼성 인터넷으로 열어 주세요') + st(2, INSIC.plus, '거기서 \'추가하기\' 다시 누르기', '바로 설치 창이 떠요');
+  } else if (INS.samsung) {
+    sub = '삼성 인터넷 · 한 번만 하면 돼요';
+    steps = st(1, INSIC.menu, '아래 ≡ 누르기', '화면 맨 아래 오른쪽') + st(2, INSIC.plus, '현재 페이지 추가 → 홈 화면', '그다음 \'추가\'를 누르세요');
+  } else {
+    sub = '크롬 · 한 번만 하면 돼요';
+    steps = st(1, INSIC.dots, '오른쪽 위 ⋮ 누르기', '주소창 오른쪽 끝') + st(2, INSIC.plus, '홈 화면에 추가 (또는 앱 설치)', '그다음 \'설치\' 또는 \'추가\'를 누르세요');
+  }
+  return '<div class="pad"><p class="isub">' + sub + '</p>' + steps + arr + '</div>';
+}
 function paintBusy() { var b = el('busy'); if (b) b.className = 'busy' + (S.busy > 0 ? ' on' : ''); }
 function toast(msg) {
   var t = el('toast'); t.textContent = msg; t.className = 'on';
@@ -1026,7 +1089,7 @@ function render() {
   var app = el('app');
   if (!S.D || (S.mode === 'admin' && S.role !== 'admin')) { app.innerHTML = gateHtml(); renderSheet(); return; }
   var body = S.tab === 'cal' ? viewCal() : S.tab === 'chg' ? viewChg() : S.tab === 'admin' ? viewAdmin() : viewDay();
-  app.innerHTML = topHtml() + '<div class="main">' + body + '</div>' + footHtml();
+  app.innerHTML = topHtml() + insHtml() + '<div class="main">' + body + '</div>' + footHtml();
   var top = el('top');
   if (top) document.documentElement.style.setProperty('--topH', top.offsetHeight + 'px');
   paintBusy();
@@ -1063,6 +1126,9 @@ function renderSheet() {
     body = '<div class="pad"><label class="fld">이 청소 금액(원)<input type="number" inputmode="numeric" min="0" step="1000" id="pa_amt" value="' + pp.amt + '"></label>'
       + '<p style="margin:.4rem 0 0;color:var(--sub);font-size:.9rem">기본 금액 ' + L.won(pp.base) + ' — 추가금이 있을 때만 바꿔 주세요</p>'
       + '<div class="row"><button class="btn fill" data-act="payamt-save"' + ' data-d="' + sh.date + '" data-r="' + sh.room + '">저장</button>' + (pp.custom ? '<button class="btn" data-act="payamt-reset" data-d="' + sh.date + '" data-r="' + sh.room + '">기본 금액으로</button>' : '') + '</div></div>';
+  } else if (sh.t === 'ins') {
+    title = '홈 화면에 추가하는 법';
+    body = insSheet();
   } else if (sh.t === 'mailtest') {
     title = '메일 읽기 점검 (최근 4일)';
     body = '<div class="pad"><p style="margin:0 0 .4rem;color:var(--sub)">장부에는 쓰지 않고, 예약 메일을 어떻게 읽었는지만 보여 줘요.</p>' + (sh.list.map(function (m) {
@@ -1110,6 +1176,15 @@ var ACT = {
   mon: function (e) { if (e.disabled) return; S.mon = shiftMonth(S.mon, +e.getAttribute('data-n')); window.scrollTo(0, 0); render(); },
   cell: function (e) { S.sheet = { t: 'cell', date: e.getAttribute('data-d'), room: e.getAttribute('data-r') }; renderSheet(); },
   close: function () { S.sheet = null; renderSheet(); },
+  'ins-go': function () {
+    if (INS.kakao) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href); return; }
+    if (INS.prompt) {
+      var p = INS.prompt; INS.prompt = null;
+      try { p.prompt(); p.userChoice.then(function (c) { if (c && c.outcome === 'accepted') { store.set('cl_ins_x', '1'); render(); } }, function () {}); return; } catch (e) {}
+    }
+    S.sheet = { t: 'ins' }; renderSheet();
+  },
+  'ins-x': function () { store.set('cl_ins_x', '1'); render(); },
   'goto-day': function (e) { S.sheet = null; S.day = e.getAttribute('data-d'); S.tab = S.day === S.now.today ? 'today' : S.day === L.addDays(S.now.today, 1) ? 'tomorrow' : 'day'; window.scrollTo(0, 0); render(); },
   'copy-day': function () { copyOut(L.copyText(S.day, dayCells(S.day), S.D.rooms)); },
   'copy-out': function (e) { copyOut(S.A.out[+e.getAttribute('data-i')].text); },
@@ -1188,7 +1263,7 @@ document.addEventListener('click', function (ev) {
   while (e && e !== document.body && !(e.getAttribute && e.getAttribute('data-act'))) e = e.parentNode;
   if (!e || e === document.body || !e.getAttribute) return;
   var an = e.getAttribute('data-act'), fn = ACT[an];
-  if (fn && S.cached && !/^(tab|sub|day|mon|cell|close|fs|goto-day|refresh|done|ack|ack-all|fee-mon)$/.test(an)) { toast('새 자료를 불러오는 중이에요. 잠시만요'); return; }
+  if (fn && S.cached && !/^(tab|sub|day|mon|cell|close|fs|goto-day|refresh|done|ack|ack-all|fee-mon|ins-go|ins-x)$/.test(an)) { toast('새 자료를 불러오는 중이에요. 잠시만요'); return; }
   if (fn) fn(e, ev);
 });
 document.addEventListener('keydown', function (ev) {
@@ -1228,6 +1303,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-22r';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-22s';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
