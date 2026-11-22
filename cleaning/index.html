@@ -142,6 +142,8 @@ tr.past{opacity:.4}
 .c1{display:flex;align-items:center;gap:.5rem;color:var(--sub);font-size:.95rem}
 .c2{font-size:1.15rem;margin-top:.25rem;word-break:keep-all}
 .chg.acked{opacity:.45}
+.ackn{flex:none;background:#2C313B;color:#E6E9EE;font-weight:800;font-size:.95rem;border-radius:.6rem;padding:.35rem .7rem;white-space:nowrap}
+.ackn.wait{background:none;color:var(--sub);font-weight:400;border:1.5px solid #5C6573;padding:.3rem .65rem}
 .c2.cx{color:var(--red);font-weight:800}
 .secth{padding:1rem .875rem .4rem;font-size:.9rem;color:var(--sub)}
 .btn{border:1px solid var(--ln);border-radius:.6rem;padding:.45rem .8rem;background:var(--pp2);white-space:nowrap}
@@ -671,7 +673,17 @@ var store = {
   get: function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: function (k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
 };
-var auth = { v: store.get('cl_v'), a: store.get('cl_a') };
+
+function devId() {
+  var d = store.get('cl_dev'), A = 'abcdefghijklmnopqrstuvwxyz0123456789', i;
+  if (/^[a-z0-9]{12}$/.test(d)) return d;
+  d = '';
+  try { var b = new Uint8Array(12); crypto.getRandomValues(b); for (i = 0; i < 12; i++) d += A.charAt(b[i] % 36); } catch (e) { d = ''; }
+  while (d.length < 12) d += A.charAt(Math.floor(Math.random() * 36));
+  store.set('cl_dev', d);
+  return d;
+}
+var auth = { v: store.get('cl_v'), a: store.get('cl_a'), d: devId() };
 var ROOM_SHORT = { [R_[0]]: R_[0], [R_[1]]: R_[1], [R_[2]]: R_[2], '와우산로': '와우산로' };
 
 function el(id) { return document.getElementById(id); }
@@ -703,7 +715,7 @@ function call(name) {
   });
 }
 
-function authObj() { return S.mode === 'admin' ? { a: auth.a } : (auth.v ? { v: auth.v } : { a: auth.a }); }
+function authObj() { var o = S.mode === 'admin' ? { a: auth.a } : (auth.v ? { v: auth.v } : { a: auth.a }); o.d = auth.d; return o; }
 function fail() { toast('연결이 잠시 끊겼어요. 다시 눌러 주세요.'); }
 function take(resp, cached) {
   if (!resp) return false;
@@ -773,7 +785,10 @@ function board(from, to) { return L.buildBoard(S.D.res, S.D.notes, from, to, S.n
 function dayCells(date) { return board(date, date)[0].cells; }
 
 function alertable(c) { return !!c.urgent || String(c.ts).slice(0, 7) === String(c.date).slice(0, 7); }
-function unacked() { return S.D.changes.filter(function (c) { return !c.ack && c.date >= S.now.today && alertable(c); }); }
+
+function ackN(c) { return typeof c.n === 'number' ? c.n : (c.ack ? 1 : 0); }
+function isSeen(c) { return S.role === 'admin' ? ackN(c) > 0 : !!c.ack; }
+function unacked() { return S.D.changes.filter(function (c) { return !isSeen(c) && c.date >= S.now.today && alertable(c); }); }
 function stayOf(room, date) {
   var rs = S.D.res.filter(function (r) { return r.room === room && r.checkin <= date && date < r.checkout; });
   return rs[0] || null;
@@ -875,14 +890,17 @@ function viewCal() {
 
 
 function chgHtml(c) {
-  return '<div class="chg' + (c.ack ? ' acked' : '') + '"><div class="tx"><div class="c1"><span class="rn ' + RC[c.room] + '">' + h(roomName(c.room)) + '</span>' + L.mdwLabel(c.date) + '</div><div class="c2' + (c.kind === '취소' ? ' cx' : '') + '">' + ico(c.after) + '</div></div>'
-    + (c.ack ? '' : '<button class="btn fill" data-act="ack" data-id="' + h(c.id) + '">확인</button>') + '</div>';
+  var admin = S.role === 'admin', seen = isSeen(c), n = ackN(c);
+  var right = admin ? '<span class="ackn' + (n ? '' : ' wait') + '">' + (n ? n + '명 확인' : '확인 전') + '</span>'
+    : (seen ? '' : '<button class="btn fill" data-act="ack" data-id="' + h(c.id) + '">확인</button>');
+  return '<div class="chg' + (seen && !admin ? ' acked' : '') + '"><div class="tx"><div class="c1"><span class="rn ' + RC[c.room] + '">' + h(roomName(c.room)) + '</span>' + L.mdwLabel(c.date) + '</div><div class="c2' + (c.kind === '취소' ? ' cx' : '') + '">' + ico(c.after) + '</div></div>'
+    + right + '</div>';
 }
 function viewChg() {
-  var t = S.now.today, all = S.D.changes.filter(alertable);
-  var open = all.filter(function (c) { return !c.ack && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.ts < b.ts ? -1 : 1); });
-  var seen = all.filter(function (c) { return c.ack && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 30);
-  var out = '<div class="chead"><span>' + (open.length ? '새 추가 일정 ' + open.length + '건' : '새 추가 일정이 없어요') + '</span>' + (open.length > 1 ? '<button class="btn sm" data-act="ack-all">모두 확인</button>' : '') + '</div>';
+  var t = S.now.today, all = S.D.changes.filter(alertable), admin = S.role === 'admin';
+  var open = all.filter(function (c) { return !isSeen(c) && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.ts < b.ts ? -1 : 1); });
+  var seen = all.filter(function (c) { return isSeen(c) && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 30);
+  var out = '<div class="chead"><span>' + (open.length ? '새 추가 일정 ' + open.length + '건' : '새 추가 일정이 없어요') + '</span>' + (open.length > 1 && !admin ? '<button class="btn sm" data-act="ack-all">모두 확인</button>' : '') + '</div>';
   out += open.map(chgHtml).join('');
   if (S.role !== 'admin' && open.length) out += '<div class="guide">내용을 확인하셨으면 \'확인\'을 눌러 주세요.</div>';
   if (seen.length) out += '<div class="secth">확인한 것</div>' + seen.map(chgHtml).join('');
@@ -1303,6 +1321,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-22s';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-23a';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
