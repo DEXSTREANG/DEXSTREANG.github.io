@@ -572,11 +572,18 @@ function parseMail(mail) {
 }
 
 
-function planMail(p, all) {
+
+function cancelKey(p) { return p && p.platform && p.resNo ? p.platform + '|' + p.resNo : ''; }
+function planMail(p, all, cancelled) {
   if (!p) return { op: 'ignore', why: '예약 메일 아님' };
   var cur = null;
   if (p.resNo) for (var i = 0; i < all.length; i++) {
     if (all[i].platform === p.platform && String(all[i].resNo) === String(p.resNo)) { cur = all[i]; break; }
+  }
+  var wasCancelled = !!(cancelled && cancelKey(p) && cancelled[cancelKey(p)]) || !!(cur && cur.status === '취소');
+  if (wasCancelled && /_(confirm|amend|new|change)$/.test(p.type)) {
+    if (cur && cur.status !== '취소') return { op: 'update', id: cur.id, set: { status: '취소' } };
+    return { op: 'ignore', why: '이미 취소된 예약' };
   }
   function upsert() {
     var set = { room: p.room, checkin: p.checkin, checkout: p.checkout, guests: p.guests, status: '확정' };
@@ -627,7 +634,7 @@ var LOGIC = {
   mdwLabel: mdwLabel, isYmd: isYmd, makeYmd: makeYmd, isActive: isActive, activeRes: activeRes, findConflicts: findConflicts,
   computeCell: computeCell, smallTowels: smallTowels, bigTowels: bigTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, PAY_FROM: PAY_FROM, PRICE: PRICE, priceOf: priceOf, won: won, payOf: payOf, feeItems: feeItems, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
   cellSig: cellSig, describeCell: describeCell, diffBoard: diffBoard, noticeText: noticeText, splitText: splitText,
-  parseMail: parseMail, planMail: planMail, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten
+  parseMail: parseMail, planMail: planMail, cancelKey: cancelKey, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = LOGIC;
 
@@ -745,7 +752,9 @@ function act(name) {
 
 function board(from, to) { return L.buildBoard(S.D.res, S.D.notes, from, to, S.now); }
 function dayCells(date) { return board(date, date)[0].cells; }
-function unacked() { return S.D.changes.filter(function (c) { return !c.ack && c.date >= S.now.today; }); }
+
+function alertable(c) { return !!c.urgent || String(c.ts).slice(0, 7) === String(c.date).slice(0, 7); }
+function unacked() { return S.D.changes.filter(function (c) { return !c.ack && c.date >= S.now.today && alertable(c); }); }
 function stayOf(room, date) {
   var rs = S.D.res.filter(function (r) { return r.room === room && r.checkin <= date && date < r.checkout; });
   return rs[0] || null;
@@ -851,7 +860,7 @@ function chgHtml(c) {
     + (c.ack ? '' : '<button class="btn fill" data-act="ack" data-id="' + h(c.id) + '">확인</button>') + '</div>';
 }
 function viewChg() {
-  var t = S.now.today, all = S.D.changes.slice();
+  var t = S.now.today, all = S.D.changes.filter(alertable);
   var open = all.filter(function (c) { return !c.ack && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.ts < b.ts ? -1 : 1); });
   var seen = all.filter(function (c) { return c.ack && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 30);
   var out = '<div class="chead"><span>' + (open.length ? '새 추가 일정 ' + open.length + '건' : '새 추가 일정이 없어요') + '</span>' + (open.length > 1 ? '<button class="btn sm" data-act="ack-all">모두 확인</button>' : '') + '</div>';
@@ -1208,6 +1217,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-22j';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-22p';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
