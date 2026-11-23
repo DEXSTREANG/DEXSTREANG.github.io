@@ -1129,7 +1129,8 @@ function adminSet() {
       return '<div style="margin-top:.7rem"><b>' + h(roomName(r)) + '</b>'
         + '<label class="fld">최대 인원 (선택)<input id="cal_mg_' + r + '" inputmode="numeric" autocomplete="off" placeholder="비워 두면 확인 필요로" value="' + (c.maxGuests > 0 ? c.maxGuests : '') + '"></label>'
         + (r === '와우산로' ? '<label class="fld">에어비앤비 달력 주소<input id="cal_air_' + r + '" inputmode="url" autocomplete="off" placeholder="https://www.airbnb.co.kr/calendar/ical/…" value="' + h(c.airbnbCal || '') + '"></label>' : '')
-        + '<label class="fld">부킹 달력 주소<input id="cal_bk_' + r + '" inputmode="url" autocomplete="off" placeholder="https://ical.booking.com/…" value="' + h(c.bookingCal || '') + '"></label></div>';
+        + '<label class="fld">부킹 달력 주소' + (r === '와우산로' ? ' (스위트)' : '') + '<input id="cal_bk_' + r + '" inputmode="url" autocomplete="off" placeholder="https://ical.booking.com/…" value="' + h(c.bookingCal || '') + '"></label>'
+        + (r === '와우산로' ? '<label class="fld">부킹 달력 주소 (빌라)<input id="cal_bk2_' + r + '" inputmode="url" autocomplete="off" placeholder="https://ical.booking.com/…" value="' + h(c.bookingCal2 || '') + '"></label>' : '') + '</div>';
     }).join('')
     + '<div class="row"><button class="btn sm fill" data-act="cal-save">달력 주소 저장</button><button class="btn sm" data-act="run-now">지금 확인</button></div></div>';
   out += '<div class="box"><h3>텔레그램 알림</h3><p>' + (set.tgOn ? '연결됨' + (set.tgBot ? ' (@' + h(set.tgBot) + ')' : '') + ' — 할 일 · 오늘·내일 청소 변경 · 오후 3시까지 청소 완료가 안 눌린 방을 사장님 텔레그램으로 보내요.' : set.tgToken ? '봇 토큰은 저장돼 있어요. 텔레그램에서 봇에게 \'시작\'을 누른 뒤 \'연결하기\'를 눌러 주세요.' : '아직 연결 전이에요.') + '</p>'
@@ -1404,7 +1405,7 @@ var ACT = {
   'apw-save': function () { act('apiSettings', { adminPw: val('s_apw') }).then(function (ok) { if (ok) toast('관리 비밀번호를 바꿨어요'); }); },
   'mail-toggle': function () { act('apiSettings', { mailOn: !S.A.set.mailOn }); },
   'cal-save': function () {
-    var list = L.ROOM_IDS.map(function (r) { var a = el('cal_air_' + r); return { room: r, maxGuests: val('cal_mg_' + r), airbnbCal: a ? a.value : '', bookingCal: val('cal_bk_' + r) }; });
+    var list = L.ROOM_IDS.map(function (r) { var a = el('cal_air_' + r), b2 = el('cal_bk2_' + r); return { room: r, maxGuests: val('cal_mg_' + r), airbnbCal: a ? a.value : '', bookingCal: val('cal_bk_' + r), bookingCal2: b2 ? b2.value : '' }; });
     act('apiSaveCal', list).then(function (ok) { if (ok) toast('저장했어요 — \'지금 확인\'을 누르면 바로 읽어요'); });
   },
   'run-now': function () { act('apiRunNow').then(function (ok) { if (ok) toast('지금 확인했어요'); }); },
@@ -1479,6 +1480,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-24e';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-24f';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
