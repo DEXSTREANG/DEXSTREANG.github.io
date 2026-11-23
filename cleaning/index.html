@@ -558,7 +558,10 @@ function parseAirbnb(subject, flat, rawNoWs, dateYmd) {
       ok: !!(ours && code && isYmd(ci) && isYmd(co) && guests > 0)
     };
   }
-  if (/예약 변경/.test(subject)) return { type: 'airbnb_change', platform: '에어비앤비', ours: ours, hasListing: !!lid, ok: false };
+  if (/예약 변경/.test(subject)) {
+    var dc = /reservations\/details\/([A-Z0-9]{8,12})/.exec(rawNoWs);
+    return { type: 'airbnb_change', platform: '에어비앤비', resNo: dc ? dc[1] : '', ours: ours, hasListing: !!lid, ok: false };
+  }
   return null;
 }
 
@@ -595,7 +598,8 @@ function parseMail(mail) {
 
 
 function cancelKey(p) { return p && p.platform && p.resNo ? p.platform + '|' + p.resNo : ''; }
-function planMail(p, all, cancelled) {
+
+function planMail(p, all, cancelled, calRooms) {
   if (!p) return { op: 'ignore', why: '예약 메일 아님' };
   var cur = null;
   if (p.resNo) for (var i = 0; i < all.length; i++) {
@@ -609,7 +613,8 @@ function planMail(p, all, cancelled) {
   function upsert() {
     var set = { room: p.room, checkin: p.checkin, checkout: p.checkout, guests: p.guests, status: '확정' };
     if (cur) {
-      var same = cur.room === set.room && cur.checkin === set.checkin && cur.checkout === set.checkout && Number(cur.guests) === set.guests && cur.status === '확정';
+      if (String(cur.memo || '').indexOf(GUESS) >= 0) set.memo = stripGuess(cur.memo);   
+      var same = set.memo === undefined && cur.room === set.room && cur.checkin === set.checkin && cur.checkout === set.checkout && Number(cur.guests) === set.guests && cur.status === '확정';
       return same ? { op: 'ignore', why: '이미 같은 내용' } : { op: 'update', id: cur.id, set: set };
     }
     set.platform = p.platform; set.resNo = p.resNo;
@@ -645,9 +650,124 @@ function planMail(p, all, cancelled) {
       return { op: 'flag', why: '트립닷컴 예약 관련 메일이 왔어요 — 예약이면 장부에 직접 넣어 주세요' };
     case 'airbnb_change':
       if (p.hasListing && !p.ours) return { op: 'ignore', why: '3BR 숙소가 아님' };
+      if (cur && calRooms && calRooms[cur.room]) return { op: 'flag', why: '에어비앤비 예약이 바뀌었어요 (' + cur.room + ' · ' + p.resNo + ') — 날짜는 에어비앤비 달력에서 30분 안에 자동으로 맞춰요. 인원이 바뀌었으면 예약에서 고쳐 주세요' };
       return { op: 'flag', why: '에어비앤비 예약 변경 메일이 왔어요 — 3BR 예약이면 날짜·인원을 확인해 주세요' };
   }
   return { op: 'ignore', why: '알 수 없는 메일' };
+}
+
+
+var GUESS = '[인원 추정]';
+function stripGuess(m) {
+  return String(m == null ? '' : m).split(' · ').filter(function (x) { return x.indexOf(GUESS) < 0; }).join(' · ').trim();
+}
+function joinMemo(a, b) { a = String(a == null ? '' : a).trim(); b = String(b == null ? '' : b).trim(); return a && b ? a + ' · ' + b : (a || b); }
+function guessSeg(n) { return GUESS + ' 최대 인원 ' + n + '명으로 넣음'; }
+function isCalText(t) { return /BEGIN:VCALENDAR/i.test(String(t || '')); }
+function parseIcs(text) {
+  var lines = String(text || '').replace(/\r\n?/g, '\n').replace(/\n[ \t]/g, '').split('\n');
+  var out = [], ev = null;
+  lines.forEach(function (ln) {
+    if (/^BEGIN:VEVENT/i.test(ln)) { ev = { start: '', end: '', summary: '', desc: '', uid: '' }; return; }
+    if (/^END:VEVENT/i.test(ln)) {
+      if (ev && isYmd(ev.start)) { if (!isYmd(ev.end) || ev.end <= ev.start) ev.end = addDays(ev.start, 1); out.push(ev); }
+      ev = null; return;
+    }
+    if (!ev) return;
+    var i = ln.indexOf(':');
+    if (i < 0) return;
+    var key = ln.substr(0, i).split(';')[0].toUpperCase(), val = ln.substr(i + 1), m;
+    if (key === 'DTSTART' || key === 'DTEND') { if ((m = /^(\d{4})(\d{2})(\d{2})/.exec(val))) ev[key === 'DTSTART' ? 'start' : 'end'] = m[1] + '-' + m[2] + '-' + m[3]; }
+    else if (key === 'SUMMARY') ev.summary = val.replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1');
+    else if (key === 'DESCRIPTION') ev.desc = val.replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1');
+    else if (key === 'UID') ev.uid = val;
+  });
+  return out;
+}
+function airbnbCode(ev) {
+  var m = /reservations\/details\/([A-Z0-9]{8,12})/i.exec(String(ev.desc || '') + ' ' + String(ev.summary || ''));
+  return m ? m[1].toUpperCase() : '';
+}
+
+function planCal(all, cals, today, until, cfg) {
+  cfg = cfg || {};
+  function nm(room) { return (cfg[room] && cfg[room].name) || room; }
+  function maxG(room) { var v = cfg[room] ? Number(cfg[room].maxGuests) : 0; return v > 0 ? v : 0; }
+  var rs = all.map(function (r) { var o = {}; for (var k in r) o[k] = r[k]; return o; }), ops = [];
+  function apply(r, set, note) { for (var k in set) r[k] = set[k]; ops.push({ op: 'update', id: r.id, set: set, note: note }); }
+  function live(r) { return r.status !== '취소'; }
+  function overlaps(r, s, e) { return isYmd(r.checkin) && isYmd(r.checkout) && r.checkin < e && s < r.checkout; }
+  function span(a, b) { return (isYmd(a) ? mdLabel(a) : '?') + '~' + (isYmd(b) ? mdLabel(b) : '?'); }
+  function sane(ev) { var n = diffDays(ev.start, ev.end); return n >= 1 && n <= 90; }
+  
+  var codeRooms = {};
+  ROOM_IDS.forEach(function (room) {
+    var c = cals[room];
+    if (c && c.airbnb) c.airbnb.forEach(function (ev) { var code = airbnbCode(ev); if (code && (codeRooms[code] = codeRooms[code] || []).indexOf(room) < 0) codeRooms[code].push(room); });
+  });
+  ROOM_IDS.forEach(function (room) {
+    var c = cals[room];
+    if (!c || !c.airbnb) return;
+    c.airbnb.forEach(function (ev) {
+      var code = airbnbCode(ev);
+      if (!code || !sane(ev) || ev.end <= today || ev.start > until) return;
+      var sole = codeRooms[code].length === 1, cur = null;   
+      for (var i = 0; i < rs.length; i++) if (rs[i].platform === '에어비앤비' && String(rs[i].resNo).toUpperCase() === code) { cur = rs[i]; break; }
+      if (cur) {
+        if (!live(cur)) return;
+        var set = {}, what = [];
+        if (sole && ROOM_IDS.indexOf(cur.room) < 0) { set.room = room; what.push('방 ' + nm(room)); }
+        if (cur.checkin !== ev.start || cur.checkout !== ev.end) { set.checkin = ev.start; set.checkout = ev.end; what.push('날짜 ' + span(cur.checkin, cur.checkout) + ' → ' + span(ev.start, ev.end)); }
+        var rm = set.room || cur.room;
+        if (cur.status === '확인필요' && ROOM_IDS.indexOf(rm) >= 0) {
+          var g = Number(cur.guests) > 0 ? Number(cur.guests) : 0, mg = maxG(rm);
+          if (!g && mg > 0) { set.guests = mg; set.memo = joinMemo(stripGuess(cur.memo), guessSeg(mg)); g = mg; what.push('인원 ' + mg + '명(최대 인원)'); }
+          if (g > 0) set.status = '확정';
+        }
+        if (Object.keys(set).length) apply(cur, set, '에어비앤비 달력: ' + code + ' ' + (what.join(', ') || '확인'));
+        return;
+      }
+      
+      if (!sole) return;
+      var hit = rs.filter(function (r) { return live(r) && r.room === room && overlaps(r, ev.start, ev.end); });
+      if (hit.length) {
+        var h0 = hit[0];   
+        if (hit.length === 1 && h0.platform === '에어비앤비' && !h0.resNo && h0.checkin === ev.start && h0.checkout === ev.end && h0.id) apply(h0, { resNo: code }, '에어비앤비 달력: ' + code + ' 예약 코드 연결');
+        return;
+      }
+      var mg2 = maxG(room);
+      var row = { room: room, platform: '에어비앤비', resNo: code, checkin: ev.start, checkout: ev.end, guests: mg2 > 0 ? mg2 : '', status: mg2 > 0 ? '확정' : '확인필요',
+        memo: joinMemo('에어비앤비 달력에서 찾은 예약', mg2 > 0 ? guessSeg(mg2) : '인원 확인 필요') };
+      rs.push(row);
+      ops.push({ op: 'insert', row: row, note: '에어비앤비 달력: ' + code + ' ' + nm(room) + ' ' + span(ev.start, ev.end) + ' 장부에 없어서 넣음' });
+    });
+  });
+  
+  rs.forEach(function (r) {
+    if (r.platform !== '부킹' || r.status !== '확인필요' || !isYmd(r.checkin) || !r.id || r.checkin < today) return;
+    var pool = ROOM_IDS.indexOf(r.room) >= 0 ? [r.room] : (String(r.memo || '').indexOf('소형 3곳') >= 0 ? SMALL_ROOMS : []);
+    var cands = [];
+    pool.forEach(function (room) {
+      var c = cals[room];
+      if (!c || !c.booking) return;
+      c.booking.forEach(function (ev) {
+        if (ev.start !== r.checkin || !sane(ev)) return;
+        if (isYmd(r.checkout) && ev.end !== r.checkout) return;
+        var taken = rs.some(function (o) { return o !== r && live(o) && o.room === room && overlaps(o, ev.start, ev.end); });
+        if (!taken && !cands.some(function (x) { return x.room === room; })) cands.push({ room: room, ev: ev });
+      });
+    });
+    if (cands.length !== 1) return;
+    var c0 = cands[0], set = {}, what = [], g = Number(r.guests) > 0 ? Number(r.guests) : 0, mg = maxG(c0.room);
+    if (r.room !== c0.room) { set.room = c0.room; what.push('방 ' + nm(c0.room)); }
+    if (r.checkout !== c0.ev.end) { set.checkout = c0.ev.end; what.push('체크아웃 ' + mdLabel(c0.ev.end)); }
+    var guessed = false;
+    if (!g && mg > 0) { set.guests = mg; g = mg; guessed = true; what.push('인원 ' + mg + '명(최대 인원)'); }
+    set.memo = joinMemo('방·체크아웃은 부킹 달력에서 가져옴', guessed ? guessSeg(mg) : (g ? '' : '인원 확인 필요'));
+    if (g > 0) set.status = '확정';
+    apply(r, set, '부킹 달력: ' + r.resNo + ' ' + what.join(', '));
+  });
+  return ops;
 }
 
 var LOGIC = {
@@ -655,7 +775,8 @@ var LOGIC = {
   mdwLabel: mdwLabel, isYmd: isYmd, makeYmd: makeYmd, isActive: isActive, activeRes: activeRes, findConflicts: findConflicts,
   computeCell: computeCell, smallTowels: smallTowels, bigTowels: bigTowels, cutoffPassed: cutoffPassed, cancelKeys: cancelKeys, buildBoard: buildBoard, isCleaning: isCleaning, PAY_FROM: PAY_FROM, PRICE: PRICE, priceOf: priceOf, won: won, payOf: payOf, feeItems: feeItems, dateLine: dateLine, blockLines: blockLines, copyText: copyText,
   cellSig: cellSig, describeCell: describeCell, diffBoard: diffBoard, noticeText: noticeText, splitText: splitText,
-  parseMail: parseMail, planMail: planMail, cancelKey: cancelKey, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten
+  parseMail: parseMail, planMail: planMail, cancelKey: cancelKey, notesFor: notesFor, htmlToText: htmlToText, flatten: flatten,
+  GUESS: GUESS, stripGuess: stripGuess, isCalText: isCalText, parseIcs: parseIcs, airbnbCode: airbnbCode, planCal: planCal
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = LOGIC;
 
@@ -997,9 +1118,20 @@ function adminSet() {
   }).join('') + '</div>';
   out += '<div class="box"><h3>비밀번호</h3><label class="fld">업체 비밀번호 ' + (set.vendorSet ? '(바꿀 때만 입력)' : '<span style="color:var(--red)">— 아직 없어요. 정해야 업체 화면이 열려요</span>') + '<input id="s_pin" inputmode="numeric" autocomplete="off" placeholder="숫자 4자리 이상"></label><div class="row"><button class="btn sm fill" data-act="pin-save">업체 비밀번호 저장</button></div>'
     + '<label class="fld">관리 비밀번호 (바꿀 때만 입력)<input id="s_apw" type="password" autocomplete="new-password" placeholder="4자 이상"></label><div class="row"><button class="btn sm fill" data-act="apw-save">관리 비밀번호 저장</button></div></div>';
-  out += '<div class="box"><h3>예약 메일 자동 읽기</h3><p>아고다 · 부킹 · 에어비앤비 · 트립닷컴이 보낸 예약 메일만 10분마다 읽어서 장부에 넣어요.<br>마지막 자동 실행: ' + (set.lastTick ? fmtTs(set.lastTick) : '아직 없음') + ' · 마지막 메일 확인: ' + (set.lastMail ? fmtTs(set.lastMail) : '아직 없음') + '</p>'
+  out += '<div class="box"><h3>예약 메일 자동 읽기</h3><p>아고다 · 부킹 · 에어비앤비 · 트립닷컴이 보낸 예약 메일만 10분마다 읽어서 장부에 넣어요.<br>마지막 자동 실행: ' + (set.lastTick ? fmtTs(set.lastTick) : '아직 없음') + ' · 마지막 메일 확인: ' + (set.lastMail ? fmtTs(set.lastMail) : '아직 없음') + (set.lastCal ? ' · 마지막 달력 확인: ' + fmtTs(set.lastCal) : '') + '</p>'
     + '<div class="row"><button class="btn sm' + (set.mailOn ? ' fill' : '') + '" data-act="mail-toggle">' + (set.mailOn ? '자동 읽기 켜짐' : '자동 읽기 꺼짐') + '</button><button class="btn sm" data-act="run-now">지금 확인</button><button class="btn sm" data-act="mail-test">메일 읽기 점검</button></div>'
     + (S.A.mail.length ? '<div style="margin-top:.6rem">' + S.A.mail.map(function (m) { return '<div class="rr"><div class="a" style="font-size:.9rem">' + h(m.subject) + '<small>' + fmtTs(m.ts) + ' · ' + h(m.note || m.op) + '</small></div></div>'; }).join('') + '</div>' : '') + '</div>';
+  
+  var cc = set.cal || {};
+  out += '<div class="box"><h3>달력 주소 (선택)</h3><p>넣어 두면 30분마다 읽어요. 에어비앤비: 예약 날짜가 바뀌면 장부도 자동으로 고치고, 메일을 못 받은 예약도 넣어요. 부킹: 새 예약의 방·체크아웃을 채워요.<br>인원은 달력에 없어요 — 최대 인원을 넣어 두면 그 인원으로 먼저 넣고 할 일로 실제 인원 확인을 부탁해요(비워 두면 \'확인 필요\'로 둬요).<br>마지막 달력 확인: ' + (set.lastCal ? fmtTs(set.lastCal) : '아직 없음') + '</p>'
+    + L.ROOM_IDS.map(function (r) {
+      var c = cc[r] || {};
+      return '<div style="margin-top:.7rem"><b>' + h(roomName(r)) + '</b>'
+        + '<label class="fld">최대 인원 (선택)<input id="cal_mg_' + r + '" inputmode="numeric" autocomplete="off" placeholder="비워 두면 확인 필요로" value="' + (c.maxGuests > 0 ? c.maxGuests : '') + '"></label>'
+        + (r === '와우산로' ? '<label class="fld">에어비앤비 달력 주소<input id="cal_air_' + r + '" inputmode="url" autocomplete="off" placeholder="https://www.airbnb.co.kr/calendar/ical/…" value="' + h(c.airbnbCal || '') + '"></label>' : '')
+        + '<label class="fld">부킹 달력 주소<input id="cal_bk_' + r + '" inputmode="url" autocomplete="off" placeholder="https://ical.booking.com/…" value="' + h(c.bookingCal || '') + '"></label></div>';
+    }).join('')
+    + '<div class="row"><button class="btn sm fill" data-act="cal-save">달력 주소 저장</button><button class="btn sm" data-act="run-now">지금 확인</button></div></div>';
   out += '<div class="box"><h3>텔레그램 알림</h3><p>' + (set.tgOn ? '연결됨' + (set.tgBot ? ' (@' + h(set.tgBot) + ')' : '') + ' — 할 일 · 오늘·내일 청소 변경 · 오후 3시까지 청소 완료가 안 눌린 방을 사장님 텔레그램으로 보내요.' : set.tgToken ? '봇 토큰은 저장돼 있어요. 텔레그램에서 봇에게 \'시작\'을 누른 뒤 \'연결하기\'를 눌러 주세요.' : '아직 연결 전이에요.') + '</p>'
     + '<label class="fld">봇 토큰' + (set.tgToken ? ' (저장돼 있음 — 바꿀 때만 입력)' : '') + '<input id="s_tg" type="password" autocomplete="off" placeholder="BotFather가 준 토큰"></label>'
     + '<div class="row"><button class="btn sm fill" data-act="tg-save">토큰 저장</button><button class="btn sm" data-act="tg-link">연결하기</button>' + (set.tgOn ? '<button class="btn sm" data-act="tg-test">시험 알림</button>' : '') + '</div></div>';
@@ -1271,6 +1403,10 @@ var ACT = {
   'pin-save': function () { act('apiSettings', { vendorPin: val('s_pin') }).then(function (ok) { if (ok) toast('업체 비밀번호를 저장했어요'); }); },
   'apw-save': function () { act('apiSettings', { adminPw: val('s_apw') }).then(function (ok) { if (ok) toast('관리 비밀번호를 바꿨어요'); }); },
   'mail-toggle': function () { act('apiSettings', { mailOn: !S.A.set.mailOn }); },
+  'cal-save': function () {
+    var list = L.ROOM_IDS.map(function (r) { var a = el('cal_air_' + r); return { room: r, maxGuests: val('cal_mg_' + r), airbnbCal: a ? a.value : '', bookingCal: val('cal_bk_' + r) }; });
+    act('apiSaveCal', list).then(function (ok) { if (ok) toast('저장했어요 — \'지금 확인\'을 누르면 바로 읽어요'); });
+  },
   'run-now': function () { act('apiRunNow').then(function (ok) { if (ok) toast('지금 확인했어요'); }); },
   'mail-test': function () { call('apiMailTest', authObj()).then(function (r) { if (r && r.ok) { S.sheet = { t: 'mailtest', list: r.list }; renderSheet(); } else take(r); }, fail); },
   'kkey-save': function () { act('apiSettings', { kakaoKey: val('s_kkey') }).then(function (ok) { if (ok) toast('저장했어요'); }); },
@@ -1343,6 +1479,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-24d';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-24e';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
