@@ -807,8 +807,8 @@ function cardHtml(date, room, c) {
   var info = S.D.rooms[room], n = S.now, admin = S.role === 'admin', on = L.isCleaning(c.k), cx = !on && S.cx[date + '|' + room];
   var out = '<div class="card ' + RC[room] + (on ? '' : ' off') + '"><div class="ch"><span class="rn ' + RC[room] + '">' + h(info.name) + '</span><span class="st' + (cx ? ' cx' : '') + '">' + (cx ? '청소 취소' : (STATE[c.k] || '')) + '</span>' + (on ? '<span class="pw">' + IC.key + ' ' + h(info.pw || '') + '</span>' : '') + '</div>';
   
-  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + (admin ? num(IC.guest, c.g, '', ' g') : '') + '</div>';
-  else if (c.k === 'nosame') out += '<div class="nums">' + (c.next ? num(IC.night, c.next.n, '박') : '') + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + (admin && c.next ? num(IC.guest, c.next.g, '', ' g') : '') + '</div>';
+  if (c.k === 'clean') out += '<div class="nums">' + num(IC.night, c.n, '박') + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + num(IC.guest, c.g, '', ' g') + '</div>';
+  else if (c.k === 'nosame') out += '<div class="nums">' + (c.next ? num(IC.night, c.next.n, '박') : '') + num(TW_S, c.small, '', ' st') + num(TW_B, c.big) + (c.next ? num(IC.guest, c.next.g, '', ' g') : '') + '</div>';
   else if (c.k === 'stay') { var st = stayOf(room, date); if (st) out += '<div class="hint">' + L.mdwLabel(st.checkin) + ' ~ ' + L.mdwLabel(st.checkout) + (admin ? ' · ' + IC.guest + ' ' + st.guests : '') + '</div>'; }
   if (on && c.notes && c.notes.length) out += '<div class="memo">' + c.notes.map(function (t) { return IC.note + ' ' + h(t); }).join('<br>') + '</div>';
   if (on && date <= n.today && date >= L.addDays(n.today, -2)) {
@@ -1322,6 +1322,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-24a';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-24b';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
