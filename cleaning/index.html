@@ -731,6 +731,7 @@ function take(resp, cached) {
     var adm = S.mode === 'admin';
     S.D = resp.data; S.A = adm ? (resp.admin || null) : null; S.now = resp.now; S.role = adm ? resp.role : 'vendor'; S.gate = null;
     S.cached = !!cached; if (!cached) saveCache(resp);
+    applyPend();
     S.cx = {}; (S.D.cx || []).forEach(function (k) { S.cx[k] = 1; });   
     if (!S.day) S.day = S.now.today;
     if (S.tab === 'today') S.day = S.now.today;
@@ -778,6 +779,26 @@ function loginK() {
 function act(name) {
   var args = [name, authObj()].concat(Array.prototype.slice.call(arguments, 1)), my = ++SEQ;
   return call.apply(null, args).then(function (r) { if (r && r.data) lastWrite = Math.max(lastWrite, my); return take(r); }, function () { fail(); return false; });
+}
+
+var PEND = {}, PSEQ = 0;
+function applyPend() {
+  if (!S.D) return;
+  Object.keys(PEND).forEach(function (k) {
+    var p = PEND[k];
+    if (p.t === 'ack') (S.D.changes || []).forEach(function (c) { if (c.id === p.id && !c.ack) c.ack = S.now.stamp; });
+    else if (p.t === 'done') { S.D.done = S.D.done || {}; if (p.on) { if (!S.D.done[p.key]) S.D.done[p.key] = S.now.stamp; } else delete S.D.done[p.key]; }
+    else if (p.t === 'pay') { S.D.pay = S.D.pay || {}; var o = S.D.pay[p.key] || { amt: '', at: '' }; S.D.pay[p.key] = { amt: o.amt || '', at: p.on ? (o.at || S.now.stamp) : '' }; }
+  });
+}
+function quick(list, name) {
+  var keys = list.map(function (p) { var k = 'q' + (++PSEQ); PEND[k] = p; return k; });
+  applyPend(); render();
+  return act.apply(null, Array.prototype.slice.call(arguments, 1)).then(function (ok) {
+    keys.forEach(function (k) { delete PEND[k]; });
+    if (!ok) refresh();
+    return ok;
+  });
 }
 
 
@@ -1208,14 +1229,14 @@ var ACT = {
   'copy-day': function () { copyOut(L.copyText(S.day, dayCells(S.day), S.D.rooms)); },
   'copy-out': function (e) { copyOut(S.A.out[+e.getAttribute('data-i')].text); },
   'copy-url': function () { copyOut(S.A.set.url || ''); },
-  done: function (e) { act('apiDone', e.getAttribute('data-d'), e.getAttribute('data-r'), e.getAttribute('data-on') === '1').then(function (ok) { if (ok && e.getAttribute('data-on') === '1') toast('청소 완료로 표시했어요'); }); },
-  ack: function (e) { act('apiAck', [e.getAttribute('data-id')]); },
-  pay: function (e) { var on = e.getAttribute('data-on') === '1'; act('apiPay', e.getAttribute('data-d'), e.getAttribute('data-r'), on).then(function (ok) { if (ok && on) toast('입금 완료로 표시했어요'); }); },
+  done: function (e) { var d = e.getAttribute('data-d'), r = e.getAttribute('data-r'), on = e.getAttribute('data-on') === '1'; quick([{ t: 'done', key: d + '|' + r, on: on }], 'apiDone', d, r, on).then(function (ok) { if (ok && on) toast('청소 완료로 표시했어요'); }); },
+  ack: function (e) { var id = e.getAttribute('data-id'); quick([{ t: 'ack', id: id }], 'apiAck', [id]); },
+  pay: function (e) { var d = e.getAttribute('data-d'), r = e.getAttribute('data-r'), on = e.getAttribute('data-on') === '1'; quick([{ t: 'pay', key: d + '|' + r, on: on }], 'apiPay', d, r, on).then(function (ok) { if (ok && on) toast('입금 완료로 표시했어요'); }); },
   'pay-amt': function (e) { S.sheet = { t: 'payamt', date: e.getAttribute('data-d'), room: e.getAttribute('data-r') }; renderSheet(); },
   'payamt-save': function (e) { act('apiPayAmt', e.getAttribute('data-d'), e.getAttribute('data-r'), val('pa_amt')).then(function (ok) { if (ok) { S.sheet = null; renderSheet(); toast('금액을 저장했어요'); } }); },
   'payamt-reset': function (e) { act('apiPayAmt', e.getAttribute('data-d'), e.getAttribute('data-r'), '').then(function (ok) { if (ok) { S.sheet = null; renderSheet(); toast('기본 금액으로 돌렸어요'); } }); },
   'fee-mon': function (e) { if (e.disabled) return; S.feeMon = shiftMonth(S.feeMon || S.now.today.substr(0, 7), +e.getAttribute('data-n')); render(); },
-  'ack-all': function () { act('apiAck', unacked().map(function (c) { return c.id; })); },
+  'ack-all': function () { var ids = unacked().map(function (c) { return c.id; }); quick(ids.map(function (id) { return { t: 'ack', id: id }; }), 'apiAck', ids); },
   sub: function (e) { S.sub = e.getAttribute('data-v'); S.ask = ''; window.scrollTo(0, 0); render(); },
   ask: function (e) {
     var k = e.getAttribute('data-k');
@@ -1322,6 +1343,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-24c';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-24d';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
