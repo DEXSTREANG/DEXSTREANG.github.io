@@ -926,7 +926,9 @@ function quick(list, name) {
 function board(from, to) { return L.buildBoard(S.D.res, S.D.notes, from, to, S.now); }
 function dayCells(date) { return board(date, date)[0].cells; }
 
-function alertable(c) { return !!c.urgent || String(c.ts).slice(0, 7) === String(c.date).slice(0, 7); }
+
+var CHG_FROM = '2026-11-26';
+function alertable(c) { return String(c.ts) >= CHG_FROM && (!!c.urgent || String(c.ts).slice(0, 7) === String(c.date).slice(0, 7)); }
 
 function hiddenIds() {
   var out = {}, cs = S.D.changes || [];
@@ -1496,6 +1498,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-26a';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-26b';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
