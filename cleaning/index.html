@@ -928,9 +928,25 @@ function dayCells(date) { return board(date, date)[0].cells; }
 
 function alertable(c) { return !!c.urgent || String(c.ts).slice(0, 7) === String(c.date).slice(0, 7); }
 
+function hiddenIds() {
+  var out = {}, cs = S.D.changes || [];
+  cs.forEach(function (x) {
+    if (x.kind !== '취소') return;
+    var rs = L.activeRes(S.D.res || [], x.room);
+    if (!rs.some(function (r) { return r.checkin === x.date; })) return;
+    var prev = '';
+    rs.forEach(function (r) { if (r.checkout < x.date && r.checkout > prev) prev = r.checkout; });
+    cs.forEach(function (c) {
+      if (c === x || c.room !== x.room || c.kind === '취소' || String(c.ts) > String(x.ts)) return;
+      if (c.date === x.date || (prev && c.date === prev && /^당일예약 x/.test(String(c.after)))) out[c.id] = 1;
+    });
+  });
+  return out;
+}
+
 function ackN(c) { return typeof c.n === 'number' ? c.n : (c.ack ? 1 : 0); }
 function isSeen(c) { return S.role === 'admin' ? ackN(c) > 0 : !!c.ack; }
-function unacked() { return S.D.changes.filter(function (c) { return !isSeen(c) && c.date >= S.now.today && alertable(c); }); }
+function unacked() { var hid = hiddenIds(); return S.D.changes.filter(function (c) { return !isSeen(c) && c.date >= S.now.today && alertable(c) && !hid[c.id]; }); }
 function stayOf(room, date) {
   var rs = S.D.res.filter(function (r) { return r.room === room && r.checkin <= date && date < r.checkout; });
   return rs[0] || null;
@@ -1040,7 +1056,7 @@ function chgHtml(c) {
     + right + '</div>';
 }
 function viewChg() {
-  var t = S.now.today, all = S.D.changes.filter(alertable), admin = S.role === 'admin';
+  var t = S.now.today, hid = hiddenIds(), all = S.D.changes.filter(function (c) { return alertable(c) && !hid[c.id]; }), admin = S.role === 'admin';
   var open = all.filter(function (c) { return !isSeen(c) && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.ts < b.ts ? -1 : 1); });
   var seen = all.filter(function (c) { return isSeen(c) && c.date >= t; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 30);
   var out = '<div class="chead"><span>' + (open.length ? '새 추가 일정 ' + open.length + '건' : '새 추가 일정이 없어요') + '</span>' + (open.length > 1 && !admin ? '<button class="btn sm" data-act="ack-all">모두 확인</button>' : '') + '</div>';
@@ -1480,6 +1496,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-24f';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-26a';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
