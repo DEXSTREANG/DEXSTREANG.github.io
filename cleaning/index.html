@@ -143,6 +143,10 @@ tr.past{opacity:.4}
 .c2{font-size:1.15rem;margin-top:.25rem;word-break:keep-all}
 .chg.acked{opacity:.45}
 .ackn{flex:none;background:#2C313B;color:#E6E9EE;font-weight:800;font-size:.95rem;border-radius:.6rem;padding:.35rem .7rem;white-space:nowrap}
+.chr{flex:none;display:flex;flex-direction:column;align-items:stretch;gap:.4rem;width:min-content}
+.chr .ackn{text-align:center;white-space:nowrap}
+.chr .btn.red{white-space:normal;line-height:1.25;text-align:center}
+.chr .btn.red.on{background:var(--red);color:#fff;font-weight:800}
 .ackn.wait{background:none;color:var(--sub);font-weight:400;border:1.5px solid #5C6573;padding:.3rem .65rem}
 .c2.cx{color:var(--red);font-weight:800}
 .secth{padding:1rem .875rem .4rem;font-size:.9rem;color:var(--sub)}
@@ -907,7 +911,8 @@ function applyPend() {
   if (!S.D) return;
   Object.keys(PEND).forEach(function (k) {
     var p = PEND[k];
-    if (p.t === 'ack') (S.D.changes || []).forEach(function (c) { if (c.id === p.id && !c.ack) c.ack = S.now.stamp; });
+    if (p.t === 'delchg') S.D.changes = (S.D.changes || []).filter(function (c) { return c.id !== p.id; });
+    else if (p.t === 'ack') (S.D.changes || []).forEach(function (c) { if (c.id === p.id && !c.ack) c.ack = S.now.stamp; });
     else if (p.t === 'done') { S.D.done = S.D.done || {}; if (p.on) { if (!S.D.done[p.key]) S.D.done[p.key] = S.now.stamp; } else delete S.D.done[p.key]; }
     else if (p.t === 'pay') { S.D.pay = S.D.pay || {}; var o = S.D.pay[p.key] || { amt: '', at: '' }; S.D.pay[p.key] = { amt: o.amt || '', at: p.on ? (o.at || S.now.stamp) : '' }; }
   });
@@ -1052,7 +1057,10 @@ function viewCal() {
 
 function chgHtml(c) {
   var admin = S.role === 'admin', seen = isSeen(c), n = ackN(c);
-  var right = admin ? '<span class="ackn' + (n ? '' : ' wait') + '">' + (n ? n + '명 확인' : '확인 전') + '</span>'
+  
+  var asked = S.ask === 'chg:' + c.id;
+  var right = admin ? '<div class="chr"><span class="ackn' + (n ? '' : ' wait') + '">' + (n ? n + '명 확인' : '확인 전') + '</span>'
+      + '<button class="btn sm red' + (asked ? ' on' : '') + '" data-act="ask" data-k="chg:' + h(c.id) + '">' + (asked ? '한 번 더 누르면 삭제' : '삭제') + '</button></div>'
     : (seen ? '' : '<button class="btn fill" data-act="ack" data-id="' + h(c.id) + '">확인</button>');
   return '<div class="chg' + (seen && !admin ? ' acked' : '') + '"><div class="tx"><div class="c1"><span class="rn ' + RC[c.room] + '">' + h(roomName(c.room)) + '</span>' + L.mdwLabel(c.date) + '</div><div class="c2' + (c.kind === '취소' ? ' cx' : '') + '">' + ico(c.after) + '</div></div>'
     + right + '</div>';
@@ -1394,6 +1402,7 @@ var ACT = {
     if (S.ask !== k) { S.ask = k; render(); return; }
     S.ask = '';
     var id = k.split(':')[1];
+    if (k.indexOf('chg:') === 0) { quick([{ t: 'delchg', id: id }], 'apiDeleteChange', id).then(function (ok) { if (ok) toast('추가 일정을 지웠어요'); }); return; }
     act(k.indexOf('del:') === 0 ? 'apiDeleteRes' : 'apiCancelRes', id).then(function (ok) { if (ok) toast(k.indexOf('del:') === 0 ? '지웠어요' : '예약을 취소로 바꿨어요'); });
   },
   'pend-save': function (e) {
@@ -1498,6 +1507,6 @@ try {
 } catch (e) { start('vendor'); }
 })();
 </script>
-<script>(function(){var V='2026-11-26b';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
+<script>(function(){var V='2026-11-27a';setTimeout(function(){fetch(location.pathname+location.search,{cache:'reload'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/var V='([^']+)'/);if(m&&m[1]!==V)location.reload()}).catch(function(){})},1500)})();</script>
 </body>
 </html>
